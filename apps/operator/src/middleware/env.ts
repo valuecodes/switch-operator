@@ -7,7 +7,9 @@ const envValidator = (): MiddlewareHandler<AppEnv> => {
   return async (c, next) => {
     const result = envSchema.safeParse(c.env);
     if (!result.success) {
-      console.error("Invalid environment:", result.error.message);
+      c.get("logger").error("invalid environment", {
+        error: result.error.message,
+      });
       return c.json({ error: "Server misconfiguration" }, 500);
     }
     await next();

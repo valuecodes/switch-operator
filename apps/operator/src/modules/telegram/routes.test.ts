@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { loggerMiddleware } from "../../middleware/logger";
 import type { AppEnv } from "../../types/env";
 import { telegramRoutes } from "./routes";
 
@@ -24,6 +25,7 @@ const validUpdate = {
 };
 
 const app = new Hono<AppEnv>();
+app.use("*", loggerMiddleware);
 app.route("/", telegramRoutes);
 
 const sendRequest = (body: unknown, headers: Record<string, string> = {}) =>

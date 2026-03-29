@@ -10,6 +10,7 @@ type WebhookInput = {
 };
 
 const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
+  const logger = c.get("logger");
   const secret = c.req.header("x-telegram-bot-api-secret-token");
   if (secret !== c.env.TELEGRAM_WEBHOOK_SECRET) {
     return c.json({ error: "Unauthorized" }, 401);
@@ -18,23 +19,21 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
   const update = c.req.valid("json");
   const message = update.message;
 
-  console.log("Incoming update:", JSON.stringify(update));
-  console.log(
-    "Chat ID:",
-    message?.chat.id,
-    "| Allowed:",
-    c.env.ALLOWED_CHAT_ID
-  );
+  logger.debug("incoming update", { update });
+  logger.debug("chat authorization check", {
+    chatId: message?.chat.id,
+    allowedChatId: c.env.ALLOWED_CHAT_ID,
+  });
 
   if (!message?.text) {
     return c.json({ ok: true });
   }
 
   const chatId = message.chat.id;
-  console.log("Message:", message.text);
+  logger.info("message received", { text: message.text, chatId });
 
   if (String(chatId) !== c.env.ALLOWED_CHAT_ID) {
-    console.log("Chat ID not allowed, ignoring");
+    logger.warn("chat not allowed, ignoring", { chatId });
     return c.json({ ok: true });
   }
 
