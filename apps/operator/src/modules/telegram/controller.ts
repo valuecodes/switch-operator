@@ -37,7 +37,7 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
     return c.json({ ok: true });
   }
 
-  const telegram = new TelegramService(c.env.TELEGRAM_BOT_TOKEN);
+  const telegram = new TelegramService(c.env.TELEGRAM_BOT_TOKEN, logger);
   await telegram.sendMessage({
     chat_id: chatId,
     text: message.text,
