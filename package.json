@@ -4,11 +4,24 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "pnpm -r --parallel --if-present dev",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [],
   "author": "Juha Kangas",
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@10.28.1",
-  "type": "module"
+  "type": "module",
+  "prettier": "@repo/prettier",
+  "devDependencies": {
+    "@ianvs/prettier-plugin-sort-imports": "4.7.1",
+    "@repo/prettier": "workspace:*",
+    "prettier": "3.8.1",
+    "prettier-plugin-tailwindcss": "0.7.2"
+  }
 }

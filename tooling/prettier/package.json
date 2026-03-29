@@ -1,0 +1,17 @@
+{
+  "name": "@repo/prettier",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./prettier.config.ts"
+  },
+  "devDependencies": {
+    "@ianvs/prettier-plugin-sort-imports": "4.7.1",
+    "@repo/typescript": "workspace:*",
+    "@types/node": "25.2.3",
+    "prettier": "3.8.1",
+    "prettier-plugin-tailwindcss": "0.7.2",
+    "typescript": "5.9.3"
+  },
+  "prettier": "@repo/prettier"
+}
