@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { onErrorHandler } from "../../middleware/error-handlers";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -52,6 +52,10 @@ describe("POST /webhook/telegram", () => {
         headers: { "Content-Type": "application/json" },
       })
     );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("returns 400 for invalid payload", async () => {
@@ -138,5 +142,60 @@ describe("POST /webhook/telegram", () => {
         body: JSON.stringify({ chat_id: 12345, text: "hello" }),
       })
     );
+  });
+
+  it("avoids logging message content or chat identifiers", async () => {
+    const debugSpy = vi
+      .spyOn(console, "debug")
+      .mockImplementation(() => undefined);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    const res = await sendRequest(validUpdate, {
+      "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+    });
+
+    expect(res.status).toBe(200);
+
+    const output = [
+      ...debugSpy.mock.calls,
+      ...logSpy.mock.calls,
+      ...warnSpy.mock.calls,
+    ]
+      .map(([entry]) => String(entry))
+      .join("\n");
+
+    expect(output).not.toContain('"update":');
+    expect(output).not.toContain('"allowedChatId":');
+    expect(output).not.toContain('"chatId":12345');
+    expect(output).not.toContain('"text":"hello"');
+  });
+
+  it("avoids logging disallowed chat identifiers", async () => {
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+
+    const res = await sendRequest(
+      {
+        ...validUpdate,
+        message: {
+          ...validUpdate.message,
+          chat: { id: 99999, type: "private" },
+        },
+      },
+      {
+        "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+      }
+    );
+
+    expect(res.status).toBe(200);
+
+    const output = warnSpy.mock.calls
+      .map(([entry]) => String(entry))
+      .join("\n");
+    expect(output).not.toContain("99999");
   });
 });

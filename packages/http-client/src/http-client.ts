@@ -58,17 +58,16 @@ class HttpClient {
     }
 
     const response = await fetch(url, init);
-
-    const json: unknown = await response.json();
+    const body = await this.parseResponseBody(response);
 
     if (!response.ok) {
       this.logger.error("request failed", {
         method,
         path,
         status: response.status,
-        body: json,
+        body,
       });
-      throw new HttpClientError(response.status, json);
+      throw new HttpClientError(response.status, body);
     }
 
     this.logger.debug("request succeeded", {
@@ -77,7 +76,29 @@ class HttpClient {
       status: response.status,
     });
 
-    return options.schema.parse(json) as z.infer<T>;
+    return options.schema.parse(body) as z.infer<T>;
+  }
+
+  private async parseResponseBody(response: Response): Promise<unknown> {
+    const text = await response.text();
+
+    if (text.length === 0) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    const isJsonResponse =
+      contentType.includes("application/json") || contentType.includes("+json");
+
+    if (!isJsonResponse) {
+      return text;
+    }
+
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      return text;
+    }
   }
 }
 
