@@ -16,7 +16,7 @@ Use it for project orientation, quality gates, and safe editing workflow.
 - Project: switch-operator
 - Workspace: pnpm workspaces (`apps/`, `packages/`, `tooling/`)
 - App workspaces: `apps/operator` (Cloudflare Worker with Hono)
-- Package workspaces: `packages/logger`
+- Package workspaces: `packages/http-client`, `packages/logger`
 - Shared tooling configs: `tooling/eslint`, `tooling/prettier`, `tooling/typescript`
 - Package manager: `pnpm` (lockfile: `pnpm-lock.yaml`)
 - Required Node version: `24.12.0` (from `.nvmrc`)
@@ -31,6 +31,7 @@ Run from project root.
 - Typecheck: `pnpm typecheck`
 - Lint: `pnpm lint`
 - Test: `pnpm test`
+- Operator webhook helper: `pnpm --filter @repo/operator set-webhook <url> [-- --prod]`
 - Format all files: `pnpm format`
 - Format check: `pnpm format:check`
 

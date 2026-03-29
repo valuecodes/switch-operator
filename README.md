@@ -1,13 +1,16 @@
 # switch-operator
 
-Personal AI assistant that communicates via Telegram, runs on Cloudflare Workers.
+Cloudflare Worker-based Telegram operator. The current implementation provides
+health checks, webhook validation, and echo replies; LLM-driven assistant
+features are planned next.
 
 ## Tech Stack
 
 - **Runtime:** Cloudflare Workers
 - **Framework:** Hono
 - **Language:** TypeScript (strict)
-- **LLM:** Claude API
+- **Messaging:** Telegram Bot API
+- **LLM:** Claude API (planned)
 - **Validation:** Zod
 - **Monorepo:** pnpm workspaces
 
@@ -16,6 +19,9 @@ Personal AI assistant that communicates via Telegram, runs on Cloudflare Workers
 ```
 apps/
   operator/     # Cloudflare Worker (Telegram bot)
+packages/
+  http-client/  # Shared fetch wrapper with response validation
+  logger/       # Shared structured logger
 tooling/
   eslint/       # Shared ESLint config
   prettier/     # Shared Prettier config
