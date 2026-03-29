@@ -14,11 +14,11 @@ Use it for project orientation, quality gates, and safe editing workflow.
 ## Project Snapshot
 
 - Project: switch-operator
-- Workspace: pnpm workspaces (`tooling/`)
+- Workspace: pnpm workspaces (`apps/`, `tooling/`)
+- App workspaces: `apps/operator` (Cloudflare Worker with Hono)
 - Shared tooling configs: `tooling/eslint`, `tooling/prettier`, `tooling/typescript`
 - Package manager: `pnpm` (lockfile: `pnpm-lock.yaml`)
 - Required Node version: `24.12.0` (from `.nvmrc`)
-- No app workspaces yet — `build`, `typecheck`, `lint`, and `test` are no-ops until one is added
 
 ## Commands
 
