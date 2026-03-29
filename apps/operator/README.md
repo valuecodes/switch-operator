@@ -2,6 +2,8 @@
 
 Cloudflare Worker that acts as a personal AI assistant via Telegram. Built with Hono.
 
+Run commands from the repo root unless noted otherwise.
+
 ## Setup
 
 1. Create a Telegram bot via [@BotFather](https://t.me/BotFather)
@@ -32,8 +34,8 @@ cloudflared tunnel --url http://localhost:8787
 Then register the webhook with the tunnel URL:
 
 ```sh
-pnpm set-webhook <tunnel-url>
-# e.g. pnpm set-webhook https://xxx.trycloudflare.com
+pnpm --filter @repo/operator set-webhook <tunnel-url>
+# e.g. pnpm --filter @repo/operator set-webhook https://xxx.trycloudflare.com
 ```
 
 Send a message to your bot on Telegram - it should echo it back.
@@ -43,27 +45,28 @@ Send a message to your bot on Telegram - it should echo it back.
 Set secrets via Wrangler CLI:
 
 ```sh
-pnpm exec wrangler secret put TELEGRAM_BOT_TOKEN
-pnpm exec wrangler secret put TELEGRAM_WEBHOOK_SECRET
-pnpm exec wrangler secret put ALLOWED_CHAT_ID
+pnpm --filter @repo/operator exec wrangler secret put TELEGRAM_BOT_TOKEN
+pnpm --filter @repo/operator exec wrangler secret put TELEGRAM_WEBHOOK_SECRET
+pnpm --filter @repo/operator exec wrangler secret put ALLOWED_CHAT_ID
 ```
 
 Create `.prod.vars` (gitignored) with your production bot credentials, then register the webhook:
 
 ```sh
-pnpm set-webhook https://switch-operator.<account>.workers.dev -- --prod
+pnpm --filter @repo/operator set-webhook \
+  https://switch-operator.<account>.workers.dev -- --prod
 ```
 
 ## Scripts
 
-| Command                           | Description                   |
-| --------------------------------- | ----------------------------- |
-| `pnpm dev`                        | Start local dev server        |
-| `pnpm deploy`                     | Deploy to Cloudflare Workers  |
-| `pnpm typecheck`                  | Run TypeScript type checking  |
-| `pnpm lint`                       | Run ESLint                    |
-| `pnpm test`                       | Run tests                     |
-| `pnpm set-webhook <url> [--prod]` | Register Telegram webhook URL |
+| Command                                                      | Description                   |
+| ------------------------------------------------------------ | ----------------------------- |
+| `pnpm dev`                                                   | Start local dev server        |
+| `pnpm deploy`                                                | Deploy to Cloudflare Workers  |
+| `pnpm typecheck`                                             | Run TypeScript type checking  |
+| `pnpm lint`                                                  | Run ESLint                    |
+| `pnpm test`                                                  | Run tests                     |
+| `pnpm --filter @repo/operator set-webhook <url> [-- --prod]` | Register Telegram webhook URL |
 
 ## Endpoints
 
