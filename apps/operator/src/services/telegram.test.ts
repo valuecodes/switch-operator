@@ -44,7 +44,7 @@ describe("TelegramService", () => {
       expect(result).toEqual({ ok: true, description: "sent" });
     });
 
-    it("throws on invalid API response", async () => {
+    it("throws on invalid API response shape", async () => {
       mockFetch.mockResolvedValueOnce(
         createJsonResponse({ invalid: "response" })
       );
@@ -52,6 +52,16 @@ describe("TelegramService", () => {
       await expect(
         service.sendMessage({ chat_id: 123, text: "hi" })
       ).rejects.toThrow();
+    });
+
+    it("throws on Telegram API error", async () => {
+      mockFetch.mockResolvedValueOnce(
+        createJsonResponse({ ok: false, description: "Bad Request" })
+      );
+
+      await expect(
+        service.sendMessage({ chat_id: 123, text: "hi" })
+      ).rejects.toThrow("Telegram API error: Bad Request");
     });
   });
 

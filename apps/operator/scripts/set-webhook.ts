@@ -69,7 +69,10 @@ const main = async () => {
     }
   );
 
-  const result = (await response.json()) as { ok: boolean; description?: string };
+  const result = (await response.json()) as {
+    ok: boolean;
+    description?: string;
+  };
   console.log("Response:", JSON.stringify(result, null, 2));
 
   if (!result.ok) {

@@ -1,3 +1,4 @@
+import type { Logger } from "@repo/logger";
 import { z } from "zod";
 
 const envSchema = z.object({
@@ -10,6 +11,10 @@ type Env = z.infer<typeof envSchema>;
 
 type AppEnv = {
   Bindings: Env;
+  Variables: {
+    logger: Logger;
+    requestId: string;
+  };
 };
 
 const parseEnv = (env: unknown): Env => {
