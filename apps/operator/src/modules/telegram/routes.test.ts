@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { onErrorHandler } from "../../middleware/error-handlers";
 import { loggerMiddleware } from "../../middleware/logger";
 import type { AppEnv } from "../../types/env";
-import { telegramRoutes } from "./routes";
+import { TELEGRAM_WEBHOOK_MAX_BODY_BYTES, telegramRoutes } from "./routes";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -86,6 +86,22 @@ describe("POST /webhook/telegram", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 401 before parsing malformed JSON when secret header is missing", async () => {
+    const res = await app.request(
+      "/webhook/telegram",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: "{invalid",
+      },
+      ENV
+    );
+
+    expect(res.status).toBe(401);
+  });
+
   it("returns 401 when secret header is missing", async () => {
     const res = await sendRequest(validUpdate);
 
@@ -142,6 +158,25 @@ describe("POST /webhook/telegram", () => {
         body: JSON.stringify({ chat_id: 12345, text: "hello" }),
       })
     );
+  });
+
+  it("returns 413 for oversized payloads", async () => {
+    const res = await sendRequest(
+      {
+        ...validUpdate,
+        message: {
+          ...validUpdate.message,
+          text: "x".repeat(TELEGRAM_WEBHOOK_MAX_BODY_BYTES),
+        },
+      },
+      {
+        "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+      }
+    );
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "Payload too large" });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("avoids logging message content or chat identifiers", async () => {
