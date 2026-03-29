@@ -14,8 +14,9 @@ Use it for project orientation, quality gates, and safe editing workflow.
 ## Project Snapshot
 
 - Project: switch-operator
-- Workspace: pnpm workspaces (`apps/`, `tooling/`)
+- Workspace: pnpm workspaces (`apps/`, `packages/`, `tooling/`)
 - App workspaces: `apps/operator` (Cloudflare Worker with Hono)
+- Package workspaces: `packages/logger`
 - Shared tooling configs: `tooling/eslint`, `tooling/prettier`, `tooling/typescript`
 - Package manager: `pnpm` (lockfile: `pnpm-lock.yaml`)
 - Required Node version: `24.12.0` (from `.nvmrc`)

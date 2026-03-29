@@ -18,25 +18,33 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
 
   const update = c.req.valid("json");
   const message = update.message;
+  const isAllowedChat =
+    message !== undefined && String(message.chat.id) === c.env.ALLOWED_CHAT_ID;
 
-  logger.debug("incoming update", { update });
+  logger.debug("incoming update", {
+    updateId: update.update_id,
+    hasMessage: message !== undefined,
+    hasText: message?.text !== undefined,
+  });
   logger.debug("chat authorization check", {
-    chatId: message?.chat.id,
-    allowedChatId: c.env.ALLOWED_CHAT_ID,
+    updateId: update.update_id,
+    isAllowedChat,
   });
 
   if (!message?.text) {
     return c.json({ ok: true });
   }
 
-  const chatId = message.chat.id;
-  logger.info("message received", { text: message.text, chatId });
-
-  if (String(chatId) !== c.env.ALLOWED_CHAT_ID) {
-    logger.warn("chat not allowed, ignoring", { chatId });
+  if (!isAllowedChat) {
+    logger.warn("chat not allowed, ignoring", { updateId: update.update_id });
     return c.json({ ok: true });
   }
 
+  const chatId = message.chat.id;
+  logger.info("message received from allowed chat", {
+    updateId: update.update_id,
+    textLength: message.text.length,
+  });
   const telegram = new TelegramService(c.env.TELEGRAM_BOT_TOKEN, logger);
   await telegram.sendMessage({
     chat_id: chatId,

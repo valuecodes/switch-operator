@@ -141,6 +141,39 @@ describe("HttpClient", () => {
       }
     });
 
+    it("preserves non-JSON error bodies in HttpClientError", async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response("<html>bad gateway</html>", {
+          status: 502,
+          headers: { "Content-Type": "text/html" },
+        })
+      );
+
+      try {
+        await client.get("/fail", { schema });
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpClientError);
+        expect((err as HttpClientError).status).toBe(502);
+        expect((err as HttpClientError).body).toBe("<html>bad gateway</html>");
+      }
+    });
+
+    it("handles empty error bodies without throwing SyntaxError", async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(null, {
+          status: 503,
+        })
+      );
+
+      try {
+        await client.get("/unavailable", { schema });
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpClientError);
+        expect((err as HttpClientError).status).toBe(503);
+        expect((err as HttpClientError).body).toBeNull();
+      }
+    });
+
     it("throws on schema validation failure", async () => {
       mockFetch.mockResolvedValueOnce(
         createJsonResponse({ unexpected: "shape" })
@@ -180,6 +213,24 @@ describe("HttpClient", () => {
         path: "/fail",
         status: 400,
         body: { error: "bad" },
+      });
+    });
+
+    it("logs raw text for non-JSON error responses", async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response("temporarily unavailable", {
+          status: 503,
+          headers: { "Content-Type": "text/plain" },
+        })
+      );
+
+      await expect(client.get("/fail", { schema })).rejects.toThrow();
+
+      expect(logger.error).toHaveBeenCalledWith("request failed", {
+        method: "GET",
+        path: "/fail",
+        status: 503,
+        body: "temporarily unavailable",
       });
     });
   });
