@@ -53,5 +53,5 @@ CI enforces the following on PRs and `main`:
 
 1. Read `AGENTS.md` before starting work.
 2. Make minimal, targeted edits.
-3. Run checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
+3. Run checks: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`.
 4. Update docs if architecture or behavior changed.
