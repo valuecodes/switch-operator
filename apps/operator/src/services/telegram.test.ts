@@ -1,8 +1,17 @@
+import type { Logger } from "@repo/logger";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TelegramService } from "./telegram";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
+
+const createMockLogger = (): Logger =>
+  ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }) as unknown as Logger;
 
 const createJsonResponse = (body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -14,7 +23,7 @@ describe("TelegramService", () => {
   let service: TelegramService;
 
   beforeEach(() => {
-    service = new TelegramService(token);
+    service = new TelegramService(token, createMockLogger());
     mockFetch.mockReset();
   });
 

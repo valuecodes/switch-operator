@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { onErrorHandler } from "../../middleware/error-handlers";
 import { loggerMiddleware } from "../../middleware/logger";
 import type { AppEnv } from "../../types/env";
 import { telegramRoutes } from "./routes";
@@ -26,6 +27,7 @@ const validUpdate = {
 
 const app = new Hono<AppEnv>();
 app.use("*", loggerMiddleware);
+app.onError(onErrorHandler);
 app.route("/", telegramRoutes);
 
 const sendRequest = (body: unknown, headers: Record<string, string> = {}) =>
@@ -58,6 +60,23 @@ describe("POST /webhook/telegram", () => {
       {
         "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
       }
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for malformed JSON", async () => {
+    const res = await app.request(
+      "/webhook/telegram",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+        },
+        body: "{invalid",
+      },
+      ENV
     );
 
     expect(res.status).toBe(400);

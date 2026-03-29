@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { HttpClient, HttpClientError } from "@repo/http-client";
+import { Logger } from "@repo/logger";
+import { z } from "zod";
+
 const parseVarsFile = (path: string): Record<string, string> => {
   const content = readFileSync(path, "utf-8");
   const vars: Record<string, string> = {};
@@ -60,24 +64,37 @@ const main = async () => {
 
   console.log(`[${isProd ? "PROD" : "DEV"}] Setting webhook to: ${webhookUrl}`);
 
-  const response = await fetch(
-    `https://api.telegram.org/bot${token}/setWebhook`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: webhookUrl, secret_token: secret }),
+  const logger = new Logger({ context: "set-webhook" });
+  const client = new HttpClient({
+    logger,
+    baseUrl: `https://api.telegram.org/bot${token}`,
+    headers: { "Content-Type": "application/json" },
+  });
+
+  const responseSchema = z
+    .object({
+      ok: z.boolean(),
+      description: z.string().optional(),
+    })
+    .loose();
+
+  try {
+    const result = await client.post("/setWebhook", {
+      schema: responseSchema,
+      body: { url: webhookUrl, secret_token: secret },
+    });
+    console.log("Response:", JSON.stringify(result, null, 2));
+
+    if (!result.ok) {
+      console.error("Webhook registration failed:", result.description);
+      process.exit(1);
     }
-  );
-
-  const result = (await response.json()) as {
-    ok: boolean;
-    description?: string;
-  };
-  console.log("Response:", JSON.stringify(result, null, 2));
-
-  if (!result.ok) {
-    console.error("Webhook registration failed:", result.description);
-    process.exit(1);
+  } catch (err) {
+    if (err instanceof HttpClientError) {
+      console.error("Webhook registration failed:", err.message, err.body);
+      process.exit(1);
+    }
+    throw err;
   }
 };
 

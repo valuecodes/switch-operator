@@ -1,27 +1,25 @@
+import { HttpClient } from "@repo/http-client";
+import type { Logger } from "@repo/logger";
+
 import type { SendMessageParams } from "../types/telegram";
 import { telegramApiResponseSchema } from "../types/telegram";
 
-const TELEGRAM_API_BASE = "https://api.telegram.org";
-
 class TelegramService {
-  private readonly token: string;
+  private readonly client: HttpClient;
 
-  constructor(token: string) {
-    this.token = token;
-  }
-
-  private buildUrl(method: string): string {
-    return `${TELEGRAM_API_BASE}/bot${this.token}/${method}`;
+  constructor(token: string, logger: Logger) {
+    this.client = new HttpClient({
+      logger,
+      baseUrl: `https://api.telegram.org/bot${token}`,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   private async request(method: string, body: Record<string, unknown>) {
-    const response = await fetch(this.buildUrl(method), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+    const result = await this.client.post(`/${method}`, {
+      schema: telegramApiResponseSchema,
+      body,
     });
-    const json: unknown = await response.json();
-    const result = telegramApiResponseSchema.parse(json);
     if (!result.ok) {
       throw new Error(
         `Telegram API error: ${result.description ?? "unknown error"}`
