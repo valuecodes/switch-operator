@@ -1,3 +1,4 @@
 import { baseConfig } from "@repo/eslint/base";
+import { defineConfig } from "eslint/config";
 
-export default baseConfig;
+export default defineConfig(baseConfig, { ignores: ["scripts/**"] });

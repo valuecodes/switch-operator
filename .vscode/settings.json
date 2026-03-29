@@ -19,6 +19,7 @@
   ],
   "github.copilot.enable": {
     "*": true,
-    "dotenv": false
+    "dotenv": false,
+    ".dev.vars": false
   }
 }
