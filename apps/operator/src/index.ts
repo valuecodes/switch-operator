@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { envValidator } from "./middleware/env";
+import { envValidatorMiddleware } from "./middleware/env";
 import { notFoundHandler, onErrorHandler } from "./middleware/error-handlers";
 import { loggerMiddleware } from "./middleware/logger";
 import { secureHeadersMiddleware } from "./middleware/secure-headers";
@@ -11,7 +11,7 @@ import type { AppEnv } from "./types/env";
 const app = new Hono<AppEnv>();
 
 app.use("*", loggerMiddleware);
-app.use("*", envValidator());
+app.use("*", envValidatorMiddleware);
 app.use("*", secureHeadersMiddleware);
 app.onError(onErrorHandler);
 
