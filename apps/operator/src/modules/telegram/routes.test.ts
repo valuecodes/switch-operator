@@ -11,7 +11,7 @@ globalThis.fetch = mockFetch;
 
 const ENV = {
   TELEGRAM_BOT_TOKEN: "test-token",
-  TELEGRAM_WEBHOOK_SECRET: "test-secret",
+  TELEGRAM_WEBHOOK_SECRET: "test-secret-that-is-at-least-32-chars!",
   ALLOWED_CHAT_ID: "12345",
 };
 
@@ -161,17 +161,28 @@ describe("POST /webhook/telegram", () => {
   });
 
   it("returns 413 for oversized payloads", async () => {
-    const res = await sendRequest(
-      {
-        ...validUpdate,
-        message: {
-          ...validUpdate.message,
-          text: "x".repeat(TELEGRAM_WEBHOOK_MAX_BODY_BYTES),
-        },
+    const oversizedBody = JSON.stringify({
+      ...validUpdate,
+      message: {
+        ...validUpdate.message,
+        text: "x".repeat(TELEGRAM_WEBHOOK_MAX_BODY_BYTES),
       },
+    });
+
+    const res = await app.request(
+      "/webhook/telegram",
       {
-        "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
-      }
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": String(
+            new TextEncoder().encode(oversizedBody).byteLength
+          ),
+          "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+        },
+        body: oversizedBody,
+      },
+      ENV
     );
 
     expect(res.status).toBe(413);

@@ -11,11 +11,6 @@ type WebhookInput = {
 
 const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
   const logger = c.get("logger");
-  const secret = c.req.header("x-telegram-bot-api-secret-token");
-  if (secret !== c.env.TELEGRAM_WEBHOOK_SECRET) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
   const update = c.req.valid("json");
   const message = update.message;
   const isAllowedChat =
