@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { zValidator } from "@hono/zod-validator";
 import { createMiddleware } from "hono/factory";
+import { timingSafeEqual } from "hono/utils/buffer";
 
 import type { AppEnv } from "../../types/env";
 import { telegramUpdateSchema } from "../../types/telegram";
@@ -12,30 +14,11 @@ const TELEGRAM_WEBHOOK_MAX_BODY_BYTES = 64 * 1024;
 const verifyTelegramSecret = createMiddleware<AppEnv>(async (c, next) => {
   const secret = c.req.header("x-telegram-bot-api-secret-token");
 
-  if (secret !== c.env.TELEGRAM_WEBHOOK_SECRET) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  await next();
-});
-
-const enforceTelegramBodyLimit = createMiddleware<AppEnv>(async (c, next) => {
-  const contentLengthHeader = c.req.header("content-length");
-  if (contentLengthHeader !== undefined) {
-    const contentLength = Number.parseInt(contentLengthHeader, 10);
-    if (
-      Number.isFinite(contentLength) &&
-      contentLength > TELEGRAM_WEBHOOK_MAX_BODY_BYTES
-    ) {
-      return c.json({ error: "Payload too large" }, 413);
-    }
-  }
-
-  const body = await c.req.text();
   if (
-    new TextEncoder().encode(body).byteLength > TELEGRAM_WEBHOOK_MAX_BODY_BYTES
+    !secret ||
+    !(await timingSafeEqual(secret, c.env.TELEGRAM_WEBHOOK_SECRET))
   ) {
-    return c.json({ error: "Payload too large" }, 413);
+    return c.json({ error: "Unauthorized" }, 401);
   }
 
   await next();
@@ -44,7 +27,10 @@ const enforceTelegramBodyLimit = createMiddleware<AppEnv>(async (c, next) => {
 telegramRoutes.post(
   "/webhook/telegram",
   verifyTelegramSecret,
-  enforceTelegramBodyLimit,
+  bodyLimit({
+    maxSize: TELEGRAM_WEBHOOK_MAX_BODY_BYTES,
+    onError: (c) => c.json({ error: "Payload too large" }, 413),
+  }),
   zValidator("json", telegramUpdateSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: "Invalid payload" }, 400);

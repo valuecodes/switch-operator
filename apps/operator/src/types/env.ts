@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1),
-  TELEGRAM_WEBHOOK_SECRET: z.string().min(1),
+  TELEGRAM_WEBHOOK_SECRET: z.string().min(32),
   ALLOWED_CHAT_ID: z.string().min(1),
 });
 
