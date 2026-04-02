@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { corsMiddleware } from "./middleware/cors";
 import { envValidatorMiddleware } from "./middleware/env";
 import { notFoundHandler, onErrorHandler } from "./middleware/error-handlers";
 import { loggerMiddleware } from "./middleware/logger";
@@ -12,6 +13,7 @@ const app = new Hono<AppEnv>();
 
 app.use("*", loggerMiddleware);
 app.use("*", envValidatorMiddleware);
+app.use("*", corsMiddleware);
 app.use("*", secureHeadersMiddleware);
 app.onError(onErrorHandler);
 

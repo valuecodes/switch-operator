@@ -30,6 +30,8 @@ app.use("*", loggerMiddleware);
 app.onError(onErrorHandler);
 app.route("/", telegramRoutes);
 
+const TELEGRAM_IP = "149.154.167.50";
+
 const sendRequest = (body: unknown, headers: Record<string, string> = {}) =>
   app.request(
     "/webhook/telegram",
@@ -37,6 +39,7 @@ const sendRequest = (body: unknown, headers: Record<string, string> = {}) =>
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "cf-connecting-ip": TELEGRAM_IP,
         ...headers,
       },
       body: JSON.stringify(body),
@@ -76,6 +79,7 @@ describe("POST /webhook/telegram", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "cf-connecting-ip": TELEGRAM_IP,
           "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
         },
         body: "{invalid",
@@ -93,6 +97,7 @@ describe("POST /webhook/telegram", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "cf-connecting-ip": TELEGRAM_IP,
         },
         body: "{invalid",
       },
@@ -178,6 +183,7 @@ describe("POST /webhook/telegram", () => {
           "Content-Length": String(
             new TextEncoder().encode(oversizedBody).byteLength
           ),
+          "cf-connecting-ip": TELEGRAM_IP,
           "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
         },
         body: oversizedBody,
