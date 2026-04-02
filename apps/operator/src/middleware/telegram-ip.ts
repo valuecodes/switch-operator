@@ -5,6 +5,9 @@ import type { AppEnv } from "../types/env";
 /**
  * Official Telegram IPv4 CIDR ranges.
  * Source: https://core.telegram.org/resources/cidr.txt
+ *
+ * Telegram only publishes IPv4 ranges. IPv6 addresses from CF-Connecting-IP
+ * will fail to parse and be correctly rejected with 403.
  */
 const TELEGRAM_CIDRS = [
   "91.105.192.0/23",

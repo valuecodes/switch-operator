@@ -30,7 +30,7 @@ describe("corsMiddleware", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
-  it("rejects CORS preflight requests", async () => {
+  it("does not set CORS headers on preflight requests", async () => {
     const app = createApp();
     const res = await app.request("/webhook/telegram", {
       method: "OPTIONS",
@@ -40,6 +40,7 @@ describe("corsMiddleware", () => {
       },
     });
 
+    expect(res.status).toBe(204);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 });
