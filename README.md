@@ -1,8 +1,8 @@
 # switch-operator
 
 Cloudflare Worker-based Telegram operator. The current implementation provides
-health checks, webhook validation, and echo replies; LLM-driven assistant
-features are planned next.
+health checks, Telegram webhook validation, Telegram IP allowlisting, and echo
+replies for one allowed chat; LLM-driven assistant features are planned next.
 
 ## Tech Stack
 

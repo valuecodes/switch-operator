@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { createMiddleware } from "hono/factory";
 import { timingSafeEqual } from "hono/utils/buffer";
 
+import { telegramIpMiddleware } from "../../middleware/telegram-ip";
 import type { AppEnv } from "../../types/env";
 import { telegramUpdateSchema } from "../../types/telegram";
 import { handleWebhook } from "./controller";
@@ -26,6 +27,7 @@ const verifyTelegramSecret = createMiddleware<AppEnv>(async (c, next) => {
 
 telegramRoutes.post(
   "/webhook/telegram",
+  telegramIpMiddleware,
   verifyTelegramSecret,
   bodyLimit({
     maxSize: TELEGRAM_WEBHOOK_MAX_BODY_BYTES,

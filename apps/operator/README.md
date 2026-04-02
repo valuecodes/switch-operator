@@ -1,6 +1,8 @@
 # Operator
 
-Cloudflare Worker that acts as a personal AI assistant via Telegram. Built with Hono.
+Cloudflare Worker that acts as a Telegram operator via Hono. The current
+implementation validates Telegram webhook requests and echoes messages back to a
+single allowed chat.
 
 Run commands from the repo root unless noted otherwise.
 
@@ -10,10 +12,17 @@ Run commands from the repo root unless noted otherwise.
 2. Create `.dev.vars` (gitignored):
    ```
    TELEGRAM_BOT_TOKEN=<token from BotFather>
-   TELEGRAM_WEBHOOK_SECRET=<any random string>
+   TELEGRAM_WEBHOOK_SECRET=<random string with at least 32 characters>
    ALLOWED_CHAT_ID=<your Telegram user ID>
    ```
 3. Install dependencies from repo root: `pnpm install`
+
+## Current Behavior
+
+- `GET /health` returns `{ "status": "ok" }`
+- `POST /webhook/telegram` only accepts requests from Telegram IP ranges
+- The webhook requires the `X-Telegram-Bot-Api-Secret-Token` header to match
+- Messages are echoed only when the Telegram chat ID matches `ALLOWED_CHAT_ID`
 
 ## Local Development
 
@@ -62,7 +71,7 @@ pnpm --filter @repo/operator set-webhook \
 | Command                                                      | Description                   |
 | ------------------------------------------------------------ | ----------------------------- |
 | `pnpm dev`                                                   | Start local dev server        |
-| `pnpm deploy`                                                | Deploy to Cloudflare Workers  |
+| `pnpm --filter @repo/operator deploy`                        | Deploy to Cloudflare Workers  |
 | `pnpm typecheck`                                             | Run TypeScript type checking  |
 | `pnpm lint`                                                  | Run ESLint                    |
 | `pnpm test`                                                  | Run tests                     |
