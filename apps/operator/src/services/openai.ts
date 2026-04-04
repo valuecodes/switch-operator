@@ -20,7 +20,7 @@ class OpenAiService {
 
     const response = await this.client.chat.completions.create({
       model: "gpt-5.4-mini",
-      max_tokens: 2048,
+      max_completion_tokens: 2048,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
