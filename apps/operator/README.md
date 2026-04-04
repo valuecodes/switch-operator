@@ -1,8 +1,8 @@
 # Operator
 
 Cloudflare Worker that acts as a Telegram operator via Hono. The current
-implementation validates Telegram webhook requests and echoes messages back to a
-single allowed chat.
+implementation validates Telegram webhook requests and sends OpenAI-generated
+replies to a single allowed chat.
 
 Run commands from the repo root unless noted otherwise.
 
@@ -14,6 +14,7 @@ Run commands from the repo root unless noted otherwise.
    TELEGRAM_BOT_TOKEN=<token from BotFather>
    TELEGRAM_WEBHOOK_SECRET=<random string with at least 32 characters>
    ALLOWED_CHAT_ID=<your Telegram user ID>
+   OPENAI_API_KEY=<your OpenAI API key>
    ```
 3. Install dependencies from repo root: `pnpm install`
 
@@ -22,7 +23,8 @@ Run commands from the repo root unless noted otherwise.
 - `GET /health` returns `{ "status": "ok" }`
 - `POST /webhook/telegram` only accepts requests from Telegram IP ranges
 - The webhook requires the `X-Telegram-Bot-Api-Secret-Token` header to match
-- Messages are echoed only when the Telegram chat ID matches `ALLOWED_CHAT_ID`
+- Messages from the allowed Telegram chat are forwarded to OpenAI
+- OpenAI responses are sent back only when the Telegram chat ID matches `ALLOWED_CHAT_ID`
 
 ## Local Development
 
@@ -47,7 +49,8 @@ pnpm --filter @repo/operator set-webhook <tunnel-url>
 # e.g. pnpm --filter @repo/operator set-webhook https://xxx.trycloudflare.com
 ```
 
-Send a message to your bot on Telegram - it should echo it back.
+Send a message to your bot on Telegram. The worker will send the message text to
+OpenAI and reply in Telegram with the model output.
 
 ## Production
 
@@ -57,6 +60,7 @@ Set secrets via Wrangler CLI:
 pnpm --filter @repo/operator exec wrangler secret put TELEGRAM_BOT_TOKEN
 pnpm --filter @repo/operator exec wrangler secret put TELEGRAM_WEBHOOK_SECRET
 pnpm --filter @repo/operator exec wrangler secret put ALLOWED_CHAT_ID
+pnpm --filter @repo/operator exec wrangler secret put OPENAI_API_KEY
 ```
 
 Create `.prod.vars` (gitignored) with your production bot credentials, then register the webhook:

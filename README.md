@@ -1,8 +1,8 @@
 # switch-operator
 
 Cloudflare Worker-based Telegram operator. The current implementation provides
-health checks, Telegram webhook validation, Telegram IP allowlisting, and echo
-replies for one allowed chat; LLM-driven assistant features are planned next.
+health checks, Telegram webhook validation, Telegram IP allowlisting, and
+OpenAI-generated replies for one allowed chat.
 
 ## Tech Stack
 
@@ -10,7 +10,7 @@ replies for one allowed chat; LLM-driven assistant features are planned next.
 - **Framework:** Hono
 - **Language:** TypeScript (strict)
 - **Messaging:** Telegram Bot API
-- **LLM:** Claude API (planned)
+- **LLM:** OpenAI API
 - **Validation:** Zod
 - **Monorepo:** pnpm workspaces
 
@@ -28,4 +28,22 @@ tooling/
   typescript/   # Shared TypeScript config
 ```
 
-See [apps/operator/README.md](apps/operator/README.md) for setup and development instructions.
+## Development
+
+Requires Node 24.12.0 (see `.nvmrc`) and pnpm.
+
+```sh
+pnpm install          # install dependencies
+pnpm dev              # start local dev server
+pnpm typecheck        # type checking
+pnpm lint             # linting
+pnpm test             # run tests
+pnpm format:check     # check formatting
+pnpm format           # fix formatting
+```
+
+For local Telegram bot testing you also need
+[cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+to tunnel to your local worker. See
+[apps/operator/README.md](apps/operator/README.md) for full setup instructions
+(`.dev.vars`, webhook registration, production secrets).
