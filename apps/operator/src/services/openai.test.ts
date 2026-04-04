@@ -63,7 +63,7 @@ describe("OpenAiService", () => {
 
       expect(createMock).toHaveBeenCalledWith({
         model: "gpt-5.4-mini",
-        max_tokens: 2048,
+        max_completion_tokens: 2048,
         messages: [
           {
             role: "system",
