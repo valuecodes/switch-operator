@@ -5,6 +5,29 @@ import { TelegramService } from "../../services/telegram";
 import type { AppEnv } from "../../types/env";
 import type { TelegramUpdate } from "../../types/telegram";
 
+const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
+
+const splitMessage = (text: string): string[] => {
+  if (text.length <= TELEGRAM_MAX_MESSAGE_LENGTH) {
+    return [text];
+  }
+  const chunks: string[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    if (remaining.length <= TELEGRAM_MAX_MESSAGE_LENGTH) {
+      chunks.push(remaining);
+      break;
+    }
+    let splitAt = remaining.lastIndexOf("\n", TELEGRAM_MAX_MESSAGE_LENGTH);
+    if (splitAt <= 0) {
+      splitAt = TELEGRAM_MAX_MESSAGE_LENGTH;
+    }
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt).replace(/^\n/, "");
+  }
+  return chunks;
+};
+
 type WebhookInput = {
   in: { json: TelegramUpdate };
   out: { json: TelegramUpdate };
@@ -55,10 +78,12 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
       "Something went wrong while generating a response. Please try again.";
   }
 
-  await telegram.sendMessage({
-    chat_id: chatId,
-    text: reply,
-  });
+  for (const chunk of splitMessage(reply)) {
+    await telegram.sendMessage({
+      chat_id: chatId,
+      text: chunk,
+    });
+  }
 
   return c.json({ ok: true });
 };
