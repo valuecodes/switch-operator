@@ -51,7 +51,8 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
     logger.error("openai request failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    reply = "Something went wrong while generating a response. Please try again.";
+    reply =
+      "Something went wrong while generating a response. Please try again.";
   }
 
   await telegram.sendMessage({
