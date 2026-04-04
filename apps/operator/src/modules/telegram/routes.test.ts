@@ -1,6 +1,16 @@
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const openaiCreateMock = vi.fn().mockResolvedValue({
+  choices: [{ message: { content: "AI response" } }],
+});
+
+vi.mock("openai", () => ({
+  default: class {
+    chat = { completions: { create: openaiCreateMock } };
+  },
+}));
+
 import { onErrorHandler } from "../../middleware/error-handlers";
 import { loggerMiddleware } from "../../middleware/logger";
 import type { AppEnv } from "../../types/env";
@@ -13,6 +23,7 @@ const ENV = {
   TELEGRAM_BOT_TOKEN: "test-token",
   TELEGRAM_WEBHOOK_SECRET: "test-secret-that-is-at-least-32-chars!",
   ALLOWED_CHAT_ID: "12345",
+  OPENAI_API_KEY: "test-openai-key",
 };
 
 const validUpdate = {
@@ -149,7 +160,7 @@ describe("POST /webhook/telegram", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("echoes message back for valid request", async () => {
+  it("sends AI response for valid request", async () => {
     const res = await sendRequest(validUpdate, {
       "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
     });
@@ -160,7 +171,25 @@ describe("POST /webhook/telegram", () => {
       `https://api.telegram.org/bot${ENV.TELEGRAM_BOT_TOKEN}/sendMessage`,
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ chat_id: 12345, text: "hello" }),
+        body: JSON.stringify({ chat_id: 12345, text: "AI response" }),
+      })
+    );
+  });
+
+  it("sends error message when OpenAI fails", async () => {
+    openaiCreateMock.mockRejectedValueOnce(new Error("401 insufficient permissions"));
+
+    const res = await sendRequest(validUpdate, {
+      "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      `https://api.telegram.org/bot${ENV.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("Something went wrong") as string,
       })
     );
   });

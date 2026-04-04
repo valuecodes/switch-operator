@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 
+import { OpenAiService } from "../../services/openai";
 import { TelegramService } from "../../services/telegram";
 import type { AppEnv } from "../../types/env";
 import type { TelegramUpdate } from "../../types/telegram";
@@ -41,9 +42,21 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
     textLength: message.text.length,
   });
   const telegram = new TelegramService(c.env.TELEGRAM_BOT_TOKEN, logger);
+
+  let reply: string;
+  try {
+    const openai = new OpenAiService(c.env.OPENAI_API_KEY, logger);
+    reply = await openai.reply(message.text);
+  } catch (error) {
+    logger.error("openai request failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    reply = "Something went wrong while generating a response. Please try again.";
+  }
+
   await telegram.sendMessage({
     chat_id: chatId,
-    text: message.text,
+    text: reply,
   });
 
   return c.json({ ok: true });
