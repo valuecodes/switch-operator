@@ -177,7 +177,9 @@ describe("POST /webhook/telegram", () => {
   });
 
   it("sends error message when OpenAI fails", async () => {
-    openaiCreateMock.mockRejectedValueOnce(new Error("401 insufficient permissions"));
+    openaiCreateMock.mockRejectedValueOnce(
+      new Error("401 insufficient permissions")
+    );
 
     const res = await sendRequest(validUpdate, {
       "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
