@@ -7,6 +7,7 @@ import { loggerMiddleware } from "./middleware/logger";
 import { secureHeadersMiddleware } from "./middleware/secure-headers";
 import { healthRoutes } from "./modules/health/routes";
 import { telegramRoutes } from "./modules/telegram/routes";
+import { createScheduledHandler } from "./scheduled";
 import type { AppEnv } from "./types/env";
 
 const app = new Hono<AppEnv>();
@@ -23,4 +24,7 @@ app.route("/", telegramRoutes);
 app.notFound(notFoundHandler);
 
 // eslint-disable-next-line import/no-default-export
-export default app;
+export default {
+  fetch: app.fetch,
+  scheduled: createScheduledHandler(),
+};

@@ -8,17 +8,17 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
 });
 
-type Env = z.infer<typeof envSchema>;
-
 type AppEnv = {
-  Bindings: Env;
+  Bindings: z.infer<typeof envSchema> & {
+    DB: D1Database;
+  };
   Variables: {
     logger: Logger;
     requestId: string;
   };
 };
 
-const parseEnv = (env: unknown): Env => {
+const parseEnv = (env: unknown): z.infer<typeof envSchema> => {
   return envSchema.parse(env);
 };
 
