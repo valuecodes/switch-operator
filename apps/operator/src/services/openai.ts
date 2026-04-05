@@ -14,7 +14,7 @@ Schedule types:
 - weekly: runs every week on the specified day at hour:minute
 - monthly: runs every month on the specified day at hour:minute
 
-Use fixedMessage for exact text or messagePrompt for AI-generated content.`;
+Use fixed_message for exact text or message_prompt for AI-generated content.`;
 
 const SCHEDULE_TOOLS: ChatCompletionTool[] = [
   {
@@ -183,10 +183,24 @@ class OpenAiService {
           iteration: i,
         });
 
-        const args = JSON.parse(toolCall.function.arguments) as Record<
-          string,
-          unknown
-        >;
+        let args: Record<string, unknown>;
+        try {
+          args = JSON.parse(toolCall.function.arguments) as Record<
+            string,
+            unknown
+          >;
+        } catch {
+          this.logger.error("failed to parse tool call arguments", {
+            tool: toolCall.function.name,
+            arguments: toolCall.function.arguments,
+          });
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify({ error: "Invalid tool arguments" }),
+          });
+          continue;
+        }
         const result = await toolExecutor(toolCall.function.name, args);
 
         messages.push({
