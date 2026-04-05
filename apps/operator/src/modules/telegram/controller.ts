@@ -128,7 +128,6 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
   // Check for pending confirmation
   const pending = await pendingService.get(chatId);
   if (pending) {
-    await pendingService.clear(chatId);
     const confirmed = message.text.trim().toUpperCase() === "YES";
 
     if (confirmed) {
@@ -138,12 +137,14 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
         c.env.DB,
         logger
       );
+      await pendingService.clear(chatId);
       for (const chunk of splitMessage(result)) {
         await telegram.sendMessage({ chat_id: chatId, text: chunk });
       }
       return c.json({ ok: true });
     }
 
+    await pendingService.clear(chatId);
     await telegram.sendMessage({
       chat_id: chatId,
       text: "Action cancelled.",
