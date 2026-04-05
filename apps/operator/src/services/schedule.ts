@@ -411,6 +411,13 @@ class ScheduleService {
     return { deadLettered: false };
   }
 
+  async markSuccess(id: string) {
+    await this.db
+      .update(schedules)
+      .set({ retryCount: 0 })
+      .where(eq(schedules.id, id));
+  }
+
   async updateState(id: string, stateJson: string) {
     const STATE_MAX_BYTES = 100 * 1024;
     if (new TextEncoder().encode(stateJson).byteLength > STATE_MAX_BYTES) {
