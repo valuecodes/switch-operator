@@ -81,6 +81,10 @@ const handleScheduled = async (
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     const schedule = claimed[i];
+    if (result.status === "fulfilled") {
+      await scheduleService.markSuccess(schedule.id);
+    }
+
     if (result.status === "rejected") {
       logger.error("scheduled message failed", {
         scheduleId: schedule.id,

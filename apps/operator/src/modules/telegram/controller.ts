@@ -248,13 +248,19 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
     });
     reply =
       "Something went wrong while generating a response. Please try again.";
+    await pendingService.clear(chatId);
   }
 
-  for (const chunk of splitMessage(reply)) {
-    await telegram.sendMessage({
-      chat_id: chatId,
-      text: chunk,
-    });
+  try {
+    for (const chunk of splitMessage(reply)) {
+      await telegram.sendMessage({
+        chat_id: chatId,
+        text: chunk,
+      });
+    }
+  } catch (error) {
+    await pendingService.clear(chatId);
+    throw error;
   }
 
   return c.json({ ok: true });
