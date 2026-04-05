@@ -14,7 +14,7 @@
     {
       "binding": "DB",
       "database_name": "switch-operator-db",
-      "database_id": "<run wrangler d1 create switch-operator-db and paste id here>",
+      "database_id": "4624e5e2-045d-48a8-a6ac-a70c8a274146",
       "migrations_dir": "migrations",
     },
   ],
