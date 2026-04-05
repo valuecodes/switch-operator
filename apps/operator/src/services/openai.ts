@@ -14,7 +14,10 @@ Schedule types:
 - weekly: runs every week on the specified day at hour:minute
 - monthly: runs every month on the specified day at hour:minute
 
-Use fixed_message for exact text or message_prompt for AI-generated content.`;
+Use fixed_message for exact text or message_prompt for AI-generated content.
+
+When listing schedules, format them as a numbered list (1, 2, 3...) with key details like description, type, time, and next run.
+When the user asks to delete a schedule by number, first call list_schedules to get the current list, then use the ID from the matching position to call delete_schedule.`;
 
 const SCHEDULE_TOOLS: ChatCompletionTool[] = [
   {
