@@ -10,4 +10,15 @@
       "invocation_logs": true,
     },
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "switch-operator-db",
+      "database_id": "<run wrangler d1 create switch-operator-db and paste id here>",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "triggers": {
+    "crons": ["* * * * *"],
+  },
 }

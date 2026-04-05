@@ -19,11 +19,28 @@ import { TELEGRAM_WEBHOOK_MAX_BODY_BYTES, telegramRoutes } from "./routes";
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
+const createMockD1 = () => {
+  const mockStatement = {
+    bind: vi.fn().mockReturnThis(),
+    all: vi.fn().mockResolvedValue({ results: [], meta: {} }),
+    run: vi.fn().mockResolvedValue({ meta: { changes: 0 } }),
+    first: vi.fn().mockResolvedValue(null),
+    raw: vi.fn().mockResolvedValue([]),
+  };
+  return {
+    prepare: vi.fn().mockReturnValue(mockStatement),
+    batch: vi.fn().mockResolvedValue([]),
+    exec: vi.fn().mockResolvedValue({}),
+    dump: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+  } as unknown as D1Database;
+};
+
 const ENV = {
   TELEGRAM_BOT_TOKEN: "test-token",
   TELEGRAM_WEBHOOK_SECRET: "test-secret-that-is-at-least-32-chars!",
   ALLOWED_CHAT_ID: "12345",
   OPENAI_API_KEY: "test-openai-key",
+  DB: createMockD1(),
 };
 
 const validUpdate = {
@@ -61,6 +78,7 @@ const sendRequest = (body: unknown, headers: Record<string, string> = {}) =>
 describe("POST /webhook/telegram", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    ENV.DB = createMockD1();
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         headers: { "Content-Type": "application/json" },
