@@ -1,6 +1,7 @@
 import type { Logger } from "@repo/logger";
 import OpenAI from "openai";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
+import { z } from "zod";
 
 const SYSTEM_PROMPT = `You are a helpful personal assistant called Switch Operator. Be concise and helpful.
 
@@ -15,6 +16,14 @@ Schedule types:
 - monthly: runs every month on the specified day at hour:minute
 
 Use fixed_message for exact text or message_prompt for AI-generated content.
+
+You can also create web monitors that scrape a URL on a schedule and notify based on conditions.
+When the user wants to monitor a website for changes or check for specific content, use create_schedule with source_url + message_prompt.
+The message_prompt should describe what to look for or how to analyze the page content.
+
+Monitor examples:
+- "Notify me when a specific show is on TV" → source_url with the TV listings page, message_prompt: "Check if [show name] appears in today's listings. Notify with channel and time if found."
+- "Weekly report changes" → source_url with the report page, message_prompt: "Compare this week's content to last week. Summarize key changes."
 
 When listing schedules, format them as a numbered list (1, 2, 3...) with key details like description, type, time, and next run.
 When the user asks to delete a schedule by number, first call list_schedules to get the current list, then use the ID from the matching position to call delete_schedule.`;
@@ -63,6 +72,11 @@ const SCHEDULE_TOOLS: ChatCompletionTool[] = [
             type: "string",
             description:
               "Prompt for AI-generated message. Mutually exclusive with fixed_message.",
+          },
+          source_url: {
+            type: "string",
+            description:
+              "URL to monitor/scrape. When set, the schedule becomes a monitor: it will fetch this URL on each run, analyze the content using message_prompt, and notify only if the condition is met. Requires message_prompt. Cannot be used with fixed_message.",
           },
           description: {
             type: "string",
@@ -216,7 +230,73 @@ class OpenAiService {
 
     throw new Error("Tool calling exceeded maximum iterations");
   }
+
+  async analyzeMonitor(params: {
+    task: string;
+    scrapedContent: string;
+    previousState: string | null;
+  }): Promise<MonitorAnalysis> {
+    this.logger.debug("analyzing monitor", {
+      taskLength: params.task.length,
+      contentLength: params.scrapedContent.length,
+      hasPreviousState: params.previousState != null,
+    });
+
+    const previousStateText =
+      params.previousState ?? "First check — no previous state.";
+
+    const response = await this.client.chat.completions.create({
+      model: "gpt-5.4-mini",
+      max_completion_tokens: 4096,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: MONITOR_ANALYSIS_PROMPT },
+        {
+          role: "user",
+          content: `## Task\n${params.task}\n\n## Current page content\n${params.scrapedContent}\n\n## Previous state\n${previousStateText}`,
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message.content;
+    if (!content) {
+      throw new Error("OpenAI returned empty response for monitor analysis");
+    }
+
+    const parsed: unknown = JSON.parse(content);
+    return monitorAnalysisSchema.parse(parsed);
+  }
 }
 
+const MONITOR_ANALYSIS_PROMPT = `You are analyzing a web page for a monitoring task.
+
+The user will provide:
+1. A task describing what to check or monitor
+2. The current page content (scraped and converted to markdown)
+3. Previous state from the last check (or "First check" if this is the first run)
+
+Respond in JSON with exactly these fields:
+{
+  "notify": true or false,
+  "message": "notification message to send to the user (max 4000 chars, use markdown formatting)",
+  "newState": "concise summary of current state for comparison next time (max 2000 chars)"
+}
+
+Rules:
+- Only set "notify" to true if the condition described in the task is met
+- For diff/change detection tasks: compare current content to previous state and summarize what changed. Notify if there are meaningful changes.
+- For condition check tasks: evaluate whether the specific condition is satisfied. Notify only if it is.
+- The "message" should be informative and actionable — include relevant details from the page
+- The "newState" should contain enough information to compare against next time. Keep it concise.
+- If this is the first check, always set notify to true with a summary of current state`;
+
+const monitorAnalysisSchema = z.object({
+  notify: z.boolean(),
+  message: z.string().max(4000),
+  newState: z.string().max(5000),
+});
+
+type MonitorAnalysis = z.infer<typeof monitorAnalysisSchema>;
+
 export { MAX_TOOL_ITERATIONS, OpenAiService, SCHEDULE_TOOLS };
-export type { ToolExecutor, ToolResult };
+export type { MonitorAnalysis, ToolExecutor, ToolResult };

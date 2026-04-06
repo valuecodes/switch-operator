@@ -2,9 +2,11 @@ import { Logger } from "@repo/logger";
 
 import { OpenAiService } from "./services/openai";
 import { ScheduleService } from "./services/schedule";
+import { scrapeUrl } from "./services/scrape";
 import { TelegramService } from "./services/telegram";
 import type { AppEnv } from "./types/env";
 import { splitMessage } from "./utils/message";
+import { validateSourceUrl } from "./utils/url-validator";
 
 type Env = AppEnv["Bindings"];
 
@@ -41,11 +43,54 @@ const handleScheduled = async (
 
   const results = await Promise.allSettled(
     claimed.map(async (schedule) => {
-      // Monitor path (Stage 2 — stub)
+      // Monitor path
       if (schedule.sourceUrl) {
-        logger.info("monitor execution not yet implemented, skipping", {
-          scheduleId: schedule.id,
+        const urlCheck = validateSourceUrl(schedule.sourceUrl);
+        if (!urlCheck.valid) {
+          logger.error("monitor URL validation failed at execution", {
+            scheduleId: schedule.id,
+            reason: urlCheck.reason,
+          });
+          return;
+        }
+
+        const scrapeResult = await scrapeUrl(schedule.sourceUrl);
+        if (!scrapeResult.ok) {
+          throw new Error(`Scrape failed: ${scrapeResult.error}`);
+        }
+
+        const previousState = schedule.stateJson
+          ? (JSON.parse(schedule.stateJson) as { lastContent: string })
+              .lastContent
+          : null;
+
+        const openai = new OpenAiService(env.OPENAI_API_KEY, logger);
+        const analysis = await openai.analyzeMonitor({
+          task: schedule.messagePrompt ?? schedule.description,
+          scrapedContent: scrapeResult.text,
+          previousState,
         });
+
+        if (analysis.notify) {
+          for (const chunk of splitMessage(analysis.message)) {
+            await telegram.sendMessage({ chat_id: chatId, text: chunk });
+          }
+          logger.info("monitor notification sent", {
+            scheduleId: schedule.id,
+          });
+        } else {
+          logger.info("monitor check — no notification needed", {
+            scheduleId: schedule.id,
+          });
+        }
+
+        await scheduleService.updateState(
+          schedule.id,
+          JSON.stringify({
+            lastContent: analysis.newState,
+            lastScrapedAt: now.toISOString(),
+          })
+        );
         return;
       }
 

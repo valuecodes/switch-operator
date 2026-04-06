@@ -280,4 +280,144 @@ describe("OpenAiService", () => {
       expect(executor).not.toHaveBeenCalled();
     });
   });
+
+  describe("analyzeMonitor", () => {
+    it("returns parsed monitor analysis", async () => {
+      const analysis = {
+        notify: true,
+        message: "Seinfeld is on TV at 20:00 on MTV3",
+        newState: "Current listings include Seinfeld at 20:00",
+      };
+      createMock.mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify(analysis) } }],
+      });
+
+      const result = await service.analyzeMonitor({
+        task: "Check if Seinfeld is on today",
+        scrapedContent: "# TV Listings\n- 20:00 Seinfeld (MTV3)",
+        previousState: null,
+      });
+
+      expect(result).toEqual(analysis);
+    });
+
+    it("sends structured request with json_object format", async () => {
+      createMock.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                notify: false,
+                message: "",
+                newState: "no changes",
+              }),
+            },
+          },
+        ],
+      });
+
+      await service.analyzeMonitor({
+        task: "Check for changes",
+        scrapedContent: "content",
+        previousState: "old state",
+      });
+
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          response_format: { type: "json_object" },
+          max_completion_tokens: 4096,
+        })
+      );
+    });
+
+    it("includes previous state in user message", async () => {
+      createMock.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                notify: true,
+                message: "Changed",
+                newState: "new",
+              }),
+            },
+          },
+        ],
+      });
+
+      await service.analyzeMonitor({
+        task: "Check diff",
+        scrapedContent: "new content",
+        previousState: "old content summary",
+      });
+
+      const callArgs = createMock.mock.calls[0] as [
+        { messages: { content: string }[] },
+      ];
+      const userMsg = callArgs[0].messages[1].content;
+      expect(userMsg).toContain("old content summary");
+    });
+
+    it("uses placeholder when no previous state", async () => {
+      createMock.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                notify: true,
+                message: "First check",
+                newState: "initial",
+              }),
+            },
+          },
+        ],
+      });
+
+      await service.analyzeMonitor({
+        task: "Monitor page",
+        scrapedContent: "content",
+        previousState: null,
+      });
+
+      const callArgs = createMock.mock.calls[0] as [
+        { messages: { content: string }[] },
+      ];
+      const userMsg = callArgs[0].messages[1].content;
+      expect(userMsg).toContain("First check");
+    });
+
+    it("throws on empty response", async () => {
+      createMock.mockResolvedValueOnce({
+        choices: [{ message: { content: null } }],
+      });
+
+      await expect(
+        service.analyzeMonitor({
+          task: "test",
+          scrapedContent: "content",
+          previousState: null,
+        })
+      ).rejects.toThrow("OpenAI returned empty response for monitor analysis");
+    });
+
+    it("throws on invalid JSON structure", async () => {
+      createMock.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({ wrong: "structure" }),
+            },
+          },
+        ],
+      });
+
+      await expect(
+        service.analyzeMonitor({
+          task: "test",
+          scrapedContent: "content",
+          previousState: null,
+        })
+      ).rejects.toThrow();
+    });
+  });
 });

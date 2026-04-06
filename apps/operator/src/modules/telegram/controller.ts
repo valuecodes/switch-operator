@@ -14,6 +14,7 @@ import { TelegramService } from "../../services/telegram";
 import type { AppEnv } from "../../types/env";
 import type { TelegramUpdate } from "../../types/telegram";
 import { splitMessage } from "../../utils/message";
+import { validateSourceUrl } from "../../utils/url-validator";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -200,9 +201,11 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
         return { error: validation.error.message };
       }
 
-      // Monitor support (source_url) is not yet implemented — reject
       if (input.sourceUrl) {
-        return { error: "URL monitors are not yet supported" };
+        const urlCheck = validateSourceUrl(input.sourceUrl);
+        if (!urlCheck.valid) {
+          return { error: urlCheck.reason };
+        }
       }
 
       // Store as pending in D1 — require user confirmation
