@@ -1,8 +1,9 @@
 # Operator
 
 Cloudflare Worker that acts as a Telegram operator via Hono. The current
-implementation validates Telegram webhook requests and sends OpenAI-generated
-replies to a single allowed chat.
+implementation validates Telegram webhook requests, sends OpenAI-backed replies
+to a single allowed chat, stores schedules in Cloudflare D1, and runs reminders
+plus web monitors on a cron trigger.
 
 Run commands from the repo root unless noted otherwise.
 
@@ -17,14 +18,22 @@ Run commands from the repo root unless noted otherwise.
    OPENAI_API_KEY=<your OpenAI API key>
    ```
 3. Install dependencies from repo root: `pnpm install`
+4. Apply local D1 migrations before testing schedule features:
+   ```sh
+   pnpm --filter @repo/operator db:migrate:local
+   ```
 
 ## Current Behavior
 
 - `GET /health` returns `{ "status": "ok" }`
 - `POST /webhook/telegram` only accepts requests from Telegram IP ranges
 - The webhook requires the `X-Telegram-Bot-Api-Secret-Token` header to match
+- The webhook body is limited to 64 KiB and validated against the Telegram update schema
 - Messages from the allowed Telegram chat are forwarded to OpenAI
-- OpenAI responses are sent back only when the Telegram chat ID matches `ALLOWED_CHAT_ID`
+- The assistant can create, list, and delete scheduled reminders through tool calls
+- Schedule creation and deletion require a `YES` confirmation reply within two minutes
+- A cron trigger runs every minute and executes due reminders and web monitors from D1
+- Monitor schedules scrape a URL, analyze the content with OpenAI, and notify only when the condition matches
 
 ## Local Development
 
@@ -50,7 +59,8 @@ pnpm --filter @repo/operator set-webhook <tunnel-url>
 ```
 
 Send a message to your bot on Telegram. The worker will send the message text to
-OpenAI and reply in Telegram with the model output.
+OpenAI and reply in Telegram with the model output. Schedule creation,
+deletion, and monitoring features require the local D1 migrations above.
 
 ## Production
 
@@ -63,9 +73,16 @@ pnpm --filter @repo/operator exec wrangler secret put ALLOWED_CHAT_ID
 pnpm --filter @repo/operator exec wrangler secret put OPENAI_API_KEY
 ```
 
-Create `.prod.vars` (gitignored) with your production bot credentials, then register the webhook:
+Apply remote D1 migrations before or after deploy:
 
 ```sh
+pnpm --filter @repo/operator db:migrate:remote
+```
+
+Create `.prod.vars` (gitignored) with your production bot credentials, then deploy and register the webhook:
+
+```sh
+pnpm --filter @repo/operator deploy
 pnpm --filter @repo/operator set-webhook \
   https://switch-operator.<account>.workers.dev -- --prod
 ```
@@ -76,6 +93,8 @@ pnpm --filter @repo/operator set-webhook \
 | ------------------------------------------------------------ | ----------------------------- |
 | `pnpm dev`                                                   | Start local dev server        |
 | `pnpm --filter @repo/operator deploy`                        | Deploy to Cloudflare Workers  |
+| `pnpm --filter @repo/operator db:migrate:local`              | Apply local D1 migrations     |
+| `pnpm --filter @repo/operator db:migrate:remote`             | Apply remote D1 migrations    |
 | `pnpm typecheck`                                             | Run TypeScript type checking  |
 | `pnpm lint`                                                  | Run ESLint                    |
 | `pnpm test`                                                  | Run tests                     |
