@@ -42,10 +42,10 @@ tooling/
 flowchart TD
   A[Telegram message] --> B[Validate webhook]
   B --> C[Load operator app]
-  C --> D{Request type}
-  D -->|Chat reply| E[OpenAI generates response]
-  E --> F[Send Telegram reply]
-  D -->|Create schedule| G[Store pending action]
+  C --> D[OpenAI processes message]
+  D --> E{OpenAI action}
+  E -->|Chat reply| F[Send Telegram reply]
+  E -->|Tool call: create schedule| G[Store pending action in D1]
   G --> H[User replies YES]
   H --> I[Save schedule in D1]
   I --> J[Cron checks due schedules]
