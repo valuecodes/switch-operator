@@ -76,4 +76,14 @@ describe("validateSourceUrl", () => {
     const result = validateSourceUrl("file:///etc/passwd");
     expect(result.valid).toBe(false);
   });
+
+  it("rejects 127.0.0.2 (full loopback range)", () => {
+    const result = validateSourceUrl("https://127.0.0.2/");
+    expect(result.valid).toBe(false);
+  });
+
+  it("rejects 127.255.255.255 (loopback range upper bound)", () => {
+    const result = validateSourceUrl("https://127.255.255.255/");
+    expect(result.valid).toBe(false);
+  });
 });

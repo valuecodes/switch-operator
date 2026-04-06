@@ -279,7 +279,7 @@ Respond in JSON with exactly these fields:
 {
   "notify": true or false,
   "message": "notification message to send to the user (max 4000 chars, use markdown formatting)",
-  "newState": "concise summary of current state for comparison next time (max 2000 chars)"
+  "newState": "concise summary of current state for comparison next time (max 5000 chars)"
 }
 
 Rules:
