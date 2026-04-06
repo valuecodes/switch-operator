@@ -1,9 +1,16 @@
 # switch-operator
 
-Cloudflare Worker-based Telegram operator for one allowed Telegram chat. The
-current implementation provides health checks, Telegram webhook validation,
-OpenAI-backed replies, scheduled reminders, and website monitoring backed by
-Cloudflare D1.
+`switch-operator` is a Cloudflare Worker-based Telegram operator. It exposes a
+webhook-driven interface for OpenAI-backed replies,
+persists reminder and monitoring schedules in Cloudflare D1, and executes due
+jobs on a cron trigger.
+
+The current feature set includes:
+
+- Webhook authentication, request validation, and access control
+- OpenAI-backed chat replies
+- Scheduled reminders and recurring messages
+- Website monitoring with Telegram notifications
 
 ## Tech Stack
 
