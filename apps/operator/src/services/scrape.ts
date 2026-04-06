@@ -74,8 +74,9 @@ const collapseWhitespace = (text: string): string =>
 
 const convertContent = (
   raw: string,
-  contentType: string
+  rawContentType: string
 ): { text: string } | { error: string } => {
+  const contentType = rawContentType.toLowerCase();
   if (isHtml(contentType)) {
     const markdown = NodeHtmlMarkdown.translate(raw);
     return { text: collapseWhitespace(markdown) };

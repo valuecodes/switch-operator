@@ -59,15 +59,34 @@ const handleScheduled = async (
           throw new Error(`Scrape failed: ${scrapeResult.error}`);
         }
 
-        const previousState = schedule.stateJson
-          ? (JSON.parse(schedule.stateJson) as { lastContent: string })
-              .lastContent
-          : null;
+        let previousState: string | null = null;
+        if (schedule.stateJson) {
+          try {
+            const parsed = JSON.parse(schedule.stateJson) as Record<
+              string,
+              unknown
+            >;
+            previousState =
+              typeof parsed.lastContent === "string"
+                ? parsed.lastContent
+                : null;
+          } catch {
+            logger.warn("malformed stateJson, treating as first run", {
+              scheduleId: schedule.id,
+            });
+          }
+        }
+
+        let scrapedContent = scrapeResult.text;
+        if (scrapeResult.truncated) {
+          scrapedContent +=
+            "\n\n[Note: Page content was truncated. Analysis is based on partial content.]";
+        }
 
         const openai = new OpenAiService(env.OPENAI_API_KEY, logger);
         const analysis = await openai.analyzeMonitor({
           task: schedule.messagePrompt ?? schedule.description,
-          scrapedContent: scrapeResult.text,
+          scrapedContent,
           previousState,
         });
 
