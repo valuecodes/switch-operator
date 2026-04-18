@@ -9,6 +9,7 @@ const SCHEDULE_TYPES = ["hourly", "daily", "weekly", "monthly"] as const;
 type ScheduleType = (typeof SCHEDULE_TYPES)[number];
 
 const MAX_ACTIVE_SCHEDULES = 20;
+const MAX_RETRIES = 3;
 
 const createScheduleSchema = z
   .object({
@@ -391,12 +392,15 @@ class ScheduleService {
 
   async markFailed(id: string, currentRetryCount: number) {
     const newCount = currentRetryCount + 1;
-    if (newCount >= 5) {
+    if (newCount >= MAX_RETRIES) {
+      // All retries exhausted — reset retryCount so the next regular
+      // occurrence starts fresh.  nextRunAt was already advanced to the
+      // next occurrence by claimDueSchedules, so leave it as-is.
       await this.db
         .update(schedules)
-        .set({ active: false, retryCount: newCount })
+        .set({ retryCount: 0 })
         .where(eq(schedules.id, id));
-      return { deadLettered: true };
+      return { exhausted: true };
     }
 
     const backoffMs = newCount * 2 * 60 * 1000;
@@ -408,7 +412,7 @@ class ScheduleService {
         nextRunAt: nextRetry.toISOString(),
       })
       .where(eq(schedules.id, id));
-    return { deadLettered: false };
+    return { exhausted: false };
   }
 
   async markSuccess(id: string) {
@@ -434,6 +438,7 @@ export {
   computeNextRun,
   createScheduleSchema,
   MAX_ACTIVE_SCHEDULES,
+  MAX_RETRIES,
   SCHEDULE_TYPES,
   ScheduleService,
 };
