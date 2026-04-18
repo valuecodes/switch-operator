@@ -158,14 +158,28 @@ const handleScheduled = async (
             : String(result.reason),
       });
 
-      const { deadLettered } = await scheduleService.markFailed(
+      const { exhausted } = await scheduleService.markFailed(
         schedule.id,
         schedule.retryCount
       );
-      if (deadLettered) {
-        logger.error("schedule dead-lettered after max retries", {
+      if (exhausted) {
+        logger.warn("schedule retries exhausted, skipping until next run", {
           scheduleId: schedule.id,
         });
+        try {
+          await telegram.sendMessage({
+            chat_id: chatId,
+            text: `⚠️ Schedule "${schedule.description}" failed 3 times — skipping until next run.`,
+          });
+        } catch (notifyErr) {
+          logger.error("failed to send retry-exhaustion notification", {
+            scheduleId: schedule.id,
+            error:
+              notifyErr instanceof Error
+                ? notifyErr.message
+                : String(notifyErr),
+          });
+        }
       }
     }
   }
