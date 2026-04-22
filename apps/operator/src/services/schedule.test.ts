@@ -217,6 +217,35 @@ describe("createScheduleSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts monitor with sourceUrl + messagePrompt + keywords", () => {
+    const result = createScheduleSchema.safeParse({
+      ...base,
+      sourceUrl: "https://example.com",
+      messagePrompt: "Check for Beck",
+      keywords: ["Beck"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts monitor with empty keywords array", () => {
+    const result = createScheduleSchema.safeParse({
+      ...base,
+      sourceUrl: "https://example.com",
+      messagePrompt: "Summarize changes",
+      keywords: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects keywords without sourceUrl", () => {
+    const result = createScheduleSchema.safeParse({
+      ...base,
+      fixedMessage: "Hello",
+      keywords: ["Beck"],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects when neither fixedMessage nor messagePrompt set", () => {
     const result = createScheduleSchema.safeParse(base);
     expect(result.success).toBe(false);

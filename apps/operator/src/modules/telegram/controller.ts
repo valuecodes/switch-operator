@@ -59,6 +59,7 @@ const mapToolArgsToInput = (
   fixedMessage: args.fixed_message as string | undefined,
   messagePrompt: args.message_prompt as string | undefined,
   sourceUrl: args.source_url as string | undefined,
+  keywords: args.keywords as string[] | undefined,
   description: (args.description as string | undefined) ?? "",
 });
 
