@@ -21,8 +21,11 @@ You can also create web monitors that scrape a URL on a schedule and notify base
 When the user wants to monitor a website for changes or check for specific content, use create_schedule with source_url + message_prompt.
 The message_prompt should describe what to look for or how to analyze the page content.
 
+For monitors with large pages, use the keywords parameter to pre-filter content before AI analysis.
+When keywords are set, the system only calls AI if at least one keyword appears on the page — saving time and cost.
+
 Monitor examples:
-- "Notify me when a specific show is on TV" → source_url with the TV listings page, message_prompt: "Check if [show name] appears in today's listings. Notify with channel and time if found."
+- "Notify me when Beck is on TV" → source_url with the TV listings page, message_prompt: "Check if Beck appears in today's listings. Notify with channel and time if found.", keywords: ["Beck"]
 - "Weekly report changes" → source_url with the report page, message_prompt: "Compare this week's content to last week. Summarize key changes."
 
 When listing schedules, format them as a numbered list (1, 2, 3...) with key details like description, type, time, and next run.
@@ -77,6 +80,12 @@ const SCHEDULE_TOOLS: ChatCompletionTool[] = [
             type: "string",
             description:
               "URL to monitor/scrape. When set, the schedule becomes a monitor: it will fetch this URL on each run, analyze the content using message_prompt, and notify only if the condition is met. Requires message_prompt. Cannot be used with fixed_message.",
+          },
+          keywords: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Optional keywords to pre-filter scraped page content before AI analysis. When set, only runs AI if at least one keyword appears on the page. Use for efficiency on large pages. Only valid for monitors (requires source_url).",
           },
           description: {
             type: "string",

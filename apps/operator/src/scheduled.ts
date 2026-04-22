@@ -5,6 +5,11 @@ import { ScheduleService } from "./services/schedule";
 import { scrapeUrl } from "./services/scrape";
 import { TelegramService } from "./services/telegram";
 import type { AppEnv } from "./types/env";
+import {
+  extractWindows,
+  findKeywordPositions,
+  parseKeywords,
+} from "./utils/keywords";
 import { splitMessage } from "./utils/message";
 import { validateSourceUrl } from "./utils/url-validator";
 
@@ -81,6 +86,18 @@ const handleScheduled = async (
         if (scrapeResult.truncated) {
           scrapedContent +=
             "\n\n[Note: Page content was truncated. Analysis is based on partial content.]";
+        }
+
+        const keywords = parseKeywords(schedule.keywords);
+        if (keywords.length > 0) {
+          const positions = findKeywordPositions(scrapedContent, keywords);
+          if (positions.length === 0) {
+            logger.info("monitor keyword check — no matches, skipping", {
+              scheduleId: schedule.id,
+            });
+            return;
+          }
+          scrapedContent = extractWindows(scrapedContent, positions, 2000);
         }
 
         const openai = new OpenAiService(env.OPENAI_API_KEY, logger);

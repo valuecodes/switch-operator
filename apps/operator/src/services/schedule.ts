@@ -32,6 +32,7 @@ const createScheduleSchema = z
     fixedMessage: z.string().max(4000).optional(),
     messagePrompt: z.string().max(500).optional(),
     sourceUrl: z.string().max(2048).optional(),
+    keywords: z.array(z.string().trim().min(1).max(100)).max(10).optional(),
     description: z.string().max(200),
   })
   .refine(
@@ -46,6 +47,9 @@ const createScheduleSchema = z
         "Reminders need exactly one of fixedMessage/messagePrompt. Monitors need sourceUrl + messagePrompt, no fixedMessage.",
     }
   )
+  .refine((d) => !d.keywords?.length || d.sourceUrl != null, {
+    message: "keywords can only be used with monitors (sourceUrl must be set)",
+  })
   .refine((d) => d.scheduleType === "hourly" || d.hour != null, {
     message: "hour is required for daily/weekly/monthly schedules",
   })
@@ -311,6 +315,9 @@ class ScheduleService {
         fixedMessage: validated.fixedMessage,
         messagePrompt: validated.messagePrompt,
         sourceUrl: validated.sourceUrl,
+        keywords: validated.keywords?.length
+          ? JSON.stringify(validated.keywords)
+          : undefined,
         description: validated.description,
         nextRunAt: nextRunAt.toISOString(),
       })

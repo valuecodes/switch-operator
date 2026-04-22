@@ -18,6 +18,7 @@ const schedules = sqliteTable(
     fixedMessage: text("fixed_message"),
     messagePrompt: text("message_prompt"),
     sourceUrl: text("source_url"),
+    keywords: text("keywords"),
     stateJson: text("state_json"),
     description: text("description").notNull(),
     active: int("active", { mode: "boolean" }).notNull().default(true),
