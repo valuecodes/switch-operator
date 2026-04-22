@@ -1,7 +1,7 @@
 import { Logger } from "@repo/logger";
 
 import { OpenAiService } from "./services/openai";
-import { ScheduleService } from "./services/schedule";
+import { MAX_RETRIES, ScheduleService } from "./services/schedule";
 import { scrapeUrl } from "./services/scrape";
 import { TelegramService } from "./services/telegram";
 import type { AppEnv } from "./types/env";
@@ -82,22 +82,31 @@ const handleScheduled = async (
           }
         }
 
-        let scrapedContent = scrapeResult.text;
-        if (scrapeResult.truncated) {
-          scrapedContent +=
-            "\n\n[Note: Page content was truncated. Analysis is based on partial content.]";
-        }
+        const sourceContent = scrapeResult.text;
+        let scrapedContent = sourceContent;
 
         const keywords = parseKeywords(schedule.keywords);
         if (keywords.length > 0) {
-          const positions = findKeywordPositions(scrapedContent, keywords);
+          const positions = findKeywordPositions(sourceContent, keywords);
           if (positions.length === 0) {
             logger.info("monitor keyword check — no matches, skipping", {
               scheduleId: schedule.id,
             });
+            await scheduleService.updateState(
+              schedule.id,
+              JSON.stringify({
+                lastContent: `No keyword matches found in scraped content.${scrapeResult.truncated ? " Scraped content was truncated before keyword matching." : ""}`,
+                lastScrapedAt: now.toISOString(),
+              })
+            );
             return;
           }
-          scrapedContent = extractWindows(scrapedContent, positions, 2000);
+          scrapedContent = extractWindows(sourceContent, positions, 2000);
+        }
+
+        if (scrapeResult.truncated) {
+          scrapedContent +=
+            "\n\n[Note: Page content was truncated. Analysis is based on partial content.]";
         }
 
         const openai = new OpenAiService(env.OPENAI_API_KEY, logger);
@@ -186,7 +195,7 @@ const handleScheduled = async (
         try {
           await telegram.sendMessage({
             chat_id: chatId,
-            text: `⚠️ Schedule "${schedule.description}" failed 3 times — skipping until next run.`,
+            text: `⚠️ Schedule "${schedule.description}" failed ${String(MAX_RETRIES)} times — skipping until next run.`,
           });
         } catch (notifyErr) {
           logger.error("failed to send retry-exhaustion notification", {
