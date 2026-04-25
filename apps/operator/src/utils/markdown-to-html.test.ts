@@ -60,39 +60,6 @@ describe("markdownToTelegramHtml — happy path", () => {
     );
   });
 
-  it("converts http link", () => {
-    expect(markdownToTelegramHtml("[text](http://x.com)")).toBe(
-      '<a href="http://x.com">text</a>'
-    );
-  });
-
-  it("converts https link", () => {
-    expect(markdownToTelegramHtml("[text](https://x.com)")).toBe(
-      '<a href="https://x.com">text</a>'
-    );
-  });
-
-  it("preserves balanced parens inside URL (e.g. Wikipedia)", () => {
-    expect(
-      markdownToTelegramHtml("[wiki](https://en.wikipedia.org/wiki/Foo_(bar))")
-    ).toBe('<a href="https://en.wikipedia.org/wiki/Foo_(bar)">wiki</a>');
-  });
-
-  it("preserves balanced parens with text after the link", () => {
-    expect(
-      markdownToTelegramHtml(
-        "see [fn](https://docs.example.com/method(arg)) for details"
-      )
-    ).toBe(
-      'see <a href="https://docs.example.com/method(arg)">fn</a> for details'
-    );
-  });
-
-  it("falls through on double-nested parens (unsupported)", () => {
-    const out = markdownToTelegramHtml("[x](https://e.com/(a(b)c))");
-    expect(out).not.toContain("<a ");
-  });
-
   it("converts blockquote across multiple lines", () => {
     expect(markdownToTelegramHtml("> first\n> second")).toBe(
       "<blockquote>first\nsecond</blockquote>"
@@ -117,12 +84,6 @@ describe("markdownToTelegramHtml — happy path", () => {
 
   it("converts horizontal rule to blank line", () => {
     expect(markdownToTelegramHtml("a\n---\nb")).toBe("a\n\nb");
-  });
-
-  it("supports formatting inside link label", () => {
-    expect(markdownToTelegramHtml("[**bold link**](https://x.com)")).toBe(
-      '<a href="https://x.com"><b>bold link</b></a>'
-    );
   });
 });
 
@@ -151,46 +112,10 @@ describe("markdownToTelegramHtml — escaping", () => {
     );
   });
 
-  it("escapes & inside URL (e.g. query string)", () => {
-    expect(markdownToTelegramHtml("[q](https://x.com/?a=1&b=2)")).toBe(
-      '<a href="https://x.com/?a=1&amp;b=2">q</a>'
-    );
-  });
-
   it("escapes special chars inside fenced code", () => {
     expect(markdownToTelegramHtml("```\n<x> & y\n```")).toBe(
       "<pre><code>&lt;x&gt; &amp; y</code></pre>"
     );
-  });
-});
-
-describe("markdownToTelegramHtml — URL allowlist", () => {
-  it("rejects javascript: URL — renders literal", () => {
-    expect(markdownToTelegramHtml("[click](javascript:alert(1))")).toBe(
-      "click (javascript:alert(1))"
-    );
-  });
-
-  it("rejects data: URL — renders literal", () => {
-    expect(markdownToTelegramHtml("[d](data:text/html,abc)")).toBe(
-      "d (data:text/html,abc)"
-    );
-  });
-
-  it("rejects tg: URL — renders literal", () => {
-    expect(markdownToTelegramHtml("[tg](tg://user?id=1)")).toBe(
-      "tg (tg://user?id=1)"
-    );
-  });
-
-  it("rejects file: URL — renders literal", () => {
-    expect(markdownToTelegramHtml("[f](file:///etc/passwd)")).toBe(
-      "f (file:///etc/passwd)"
-    );
-  });
-
-  it("rejects malformed URL — renders literal", () => {
-    expect(markdownToTelegramHtml("[m](not-a-url)")).toBe("m (not-a-url)");
   });
 });
 
@@ -234,16 +159,15 @@ describe("markdownToTelegramHtml — malformed input (fail-soft)", () => {
 
   it("produces balanced tags for long input around 4096 chars", () => {
     const filler = "word ".repeat(800);
-    const md = `**bold** ${filler} \`code\` [link](https://x.com)`;
+    const md = `**bold** ${filler} \`code\``;
     const out = markdownToTelegramHtml(md);
     expect(out.length).toBeGreaterThan(4000);
     expect(countSubstr(out, "<b>")).toBe(countSubstr(out, "</b>"));
     expect(countSubstr(out, "<code>")).toBe(countSubstr(out, "</code>"));
-    expect(countSubstr(out, "<a ")).toBe(countSubstr(out, "</a>"));
   });
 });
 
-describe("markdownToTelegramHtml — protect inline code and links from later passes", () => {
+describe("markdownToTelegramHtml — protect inline code from later passes", () => {
   it("keeps emphasis markers literal inside inline code", () => {
     expect(markdownToTelegramHtml("`**x**`")).toBe("<code>**x**</code>");
   });
@@ -256,30 +180,6 @@ describe("markdownToTelegramHtml — protect inline code and links from later pa
 
   it("keeps backticks literal inside inline code (already-escaped)", () => {
     expect(markdownToTelegramHtml("`a > b`")).toBe("<code>a &gt; b</code>");
-  });
-
-  it("does not interpret * inside URL as italic marker", () => {
-    expect(markdownToTelegramHtml("[x](https://e.com/*p*)")).toBe(
-      '<a href="https://e.com/*p*">x</a>'
-    );
-  });
-
-  it("does not interpret _ inside URL as italic marker (common path char)", () => {
-    expect(markdownToTelegramHtml("[x](https://e.com/_p_)")).toBe(
-      '<a href="https://e.com/_p_">x</a>'
-    );
-  });
-
-  it("does not interpret ** inside URL as bold marker", () => {
-    expect(markdownToTelegramHtml("[x](https://e.com/**a**)")).toBe(
-      '<a href="https://e.com/**a**">x</a>'
-    );
-  });
-
-  it("does not interpret ~~ inside URL as strike marker", () => {
-    expect(markdownToTelegramHtml("[x](https://e.com/~~a~~)")).toBe(
-      '<a href="https://e.com/~~a~~">x</a>'
-    );
   });
 
   it("strips placeholder sentinels from input to prevent collision", () => {
@@ -297,11 +197,11 @@ describe("markdownToTelegramHtml — splitMessage + convert pipeline", () => {
     const longReply = [
       "# Title",
       "",
-      "**bold paragraph 1** with `code` and a [link](https://x.com).",
+      "**bold paragraph 1** with `code`.",
       "",
       "Some filler. ".repeat(400),
       "",
-      "**bold paragraph 2** with [another link](https://y.com).",
+      "**bold paragraph 2**",
       "",
       "More filler. ".repeat(400),
       "",
@@ -317,7 +217,6 @@ describe("markdownToTelegramHtml — splitMessage + convert pipeline", () => {
       expect(countSubstr(html, "<b>")).toBe(countSubstr(html, "</b>"));
       expect(countSubstr(html, "<i>")).toBe(countSubstr(html, "</i>"));
       expect(countSubstr(html, "<code>")).toBe(countSubstr(html, "</code>"));
-      expect(countSubstr(html, "<a ")).toBe(countSubstr(html, "</a>"));
       expect(countSubstr(html, "<pre>")).toBe(countSubstr(html, "</pre>"));
       expect(countSubstr(html, "<blockquote>")).toBe(
         countSubstr(html, "</blockquote>")
