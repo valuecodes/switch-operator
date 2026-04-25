@@ -23,36 +23,31 @@ A plain English sentence describing what the PR does. Rules:
 
 ## PR Description (Required Sections)
 
+Total body should fit on one screen — roughly 15–25 lines. The diff carries the detail; the description is a map, not a transcript. Don't restate what's obvious from the file list.
+
 ### What
 
-- Start with a 3–5 sentence description (plain text, no bullets).
-- Then add optional bullet points describing what changed and why.
-- Call out affected areas like `src/`, tests, or config files when relevant.
-- If CLI behavior/output changes, note the change and any new flags or args.
+2–4 short bullets. Lead with the _why_ (the bug, the gap, the user need) — one bullet, one sentence. Then list the key changes. No opening paragraph. No re-describing every file. Skip anything a reviewer can see from the diff in 10 seconds.
 
 ### How to test
 
-Provide concrete, reproducible steps using scripts that ACTUALLY exist in this repo. Before listing a command, verify it is defined in `package.json` (root or relevant workspace). Common ones in this repo:
+The commands actually run, one per line. No prose, no "expected results" — `pnpm test` either passes or it doesn't. Add a manual step only when behavior is user-visible (UI, CLI output, integration with an external service). If the manual step wasn't run, prefix with "Recommended:".
 
-- `pnpm test`
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm format:check`
-- `pnpm dev` (when behavior is part of the change)
-
-Include expected results (what "good" looks like). If you did not run something, say so and list what should be run. Do NOT invent scripts — if a script you'd want to suggest does not exist, omit it or note that it would need to be added.
+Use only scripts that exist in `package.json`. Common ones: `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm dev`.
 
 ### Security review
 
-Always include a short checklist-style review:
+Default to a single line: `No security-impacting changes.`
 
-- **Secrets / env vars:** <changed | not changed>. (Never add real secrets to the repo.)
-- **Auth / session:** <changed | not changed>.
-- **Network / API calls:** <changed | not changed>. (New external calls, endpoints, telemetry.)
-- **Data handling / PII:** <changed | not changed>. (Logging, storage, user-provided data.)
-- **Dependencies:** <added/updated | not changed>. (Call out any new deps and why; prefer minimal deps.)
+Expand to the full checklist only when at least one item is actually affected (new deps, new external calls, secrets/env touched, auth/session touched, new logging of user data). Format when expanded:
 
-If no impact, write exactly: `No security-impacting changes identified.` Then add 1–2 bullets justifying.
+- **Secrets / env vars:** <what changed>
+- **Auth / session:** <what changed>
+- **Network / API calls:** <what changed>
+- **Data handling / PII:** <what changed>
+- **Dependencies:** <what changed>
+
+Omit lines that didn't change. Don't list "not changed" five times.
 
 ## Output format
 
@@ -63,4 +58,4 @@ Output two fenced code blocks back-to-back so each is independently copy-pasteab
 
 No preamble, no explanation, no "here is your PR" wrapper text. Just the two blocks.
 
-Tone: Concise and high-signal. Use bullet points. Do not invent scripts/commands/files that are not in the repo.
+Tone: terse, high-signal, skimmable. If a sentence doesn't help the reviewer decide whether to approve, cut it.

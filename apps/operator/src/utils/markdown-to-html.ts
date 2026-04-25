@@ -39,7 +39,7 @@ const inlineConvert = (text: string, protectedSegments: string[]): string => {
   );
 
   s = s.replace(
-    /\[([^\]\n]+)\]\(([^)\n\s]+)\)/g,
+    /\[([^\]\n]+)\]\(((?:[^()\s]+|\([^()\s]*\))+)\)/g,
     (_m, label: string, url: string) => {
       if (!isSafeUrl(url)) {
         return `${label} (${url})`;

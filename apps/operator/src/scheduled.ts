@@ -11,7 +11,11 @@ import {
   parseKeywords,
 } from "./utils/keywords";
 import { markdownToTelegramHtml } from "./utils/markdown-to-html";
-import { splitMessage } from "./utils/message";
+import {
+  splitMessage,
+  TELEGRAM_HTML_SAFE_LENGTH,
+  TELEGRAM_MAX_MESSAGE_LENGTH,
+} from "./utils/message";
 import { validateSourceUrl } from "./utils/url-validator";
 
 type Env = AppEnv["Bindings"];
@@ -118,7 +122,10 @@ const handleScheduled = async (
         });
 
         if (analysis.notify) {
-          for (const chunk of splitMessage(analysis.message)) {
+          for (const chunk of splitMessage(
+            analysis.message,
+            TELEGRAM_HTML_SAFE_LENGTH
+          )) {
             await telegram.sendMessage({
               chat_id: chatId,
               text: markdownToTelegramHtml(chunk),
@@ -163,7 +170,10 @@ const handleScheduled = async (
         return;
       }
 
-      for (const chunk of splitMessage(text)) {
+      const chunkMax = formatAsHtml
+        ? TELEGRAM_HTML_SAFE_LENGTH
+        : TELEGRAM_MAX_MESSAGE_LENGTH;
+      for (const chunk of splitMessage(text, chunkMax)) {
         await telegram.sendMessage({
           chat_id: chatId,
           text: formatAsHtml ? markdownToTelegramHtml(chunk) : chunk,
