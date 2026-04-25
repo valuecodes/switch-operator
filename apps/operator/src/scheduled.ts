@@ -10,6 +10,7 @@ import {
   findKeywordPositions,
   parseKeywords,
 } from "./utils/keywords";
+import { markdownToTelegramHtml } from "./utils/markdown-to-html";
 import { splitMessage } from "./utils/message";
 import { validateSourceUrl } from "./utils/url-validator";
 
@@ -118,7 +119,11 @@ const handleScheduled = async (
 
         if (analysis.notify) {
           for (const chunk of splitMessage(analysis.message)) {
-            await telegram.sendMessage({ chat_id: chatId, text: chunk });
+            await telegram.sendMessage({
+              chat_id: chatId,
+              text: markdownToTelegramHtml(chunk),
+              parse_mode: "HTML",
+            });
           }
           logger.info("monitor notification sent", {
             scheduleId: schedule.id,
@@ -141,6 +146,7 @@ const handleScheduled = async (
 
       // Reminder path
       let text: string;
+      let formatAsHtml = false;
       if (schedule.fixedMessage) {
         text = schedule.fixedMessage;
       } else if (schedule.messagePrompt) {
@@ -149,6 +155,7 @@ const handleScheduled = async (
         if (text.length > RESPONSE_SIZE_LIMIT) {
           text = text.slice(0, RESPONSE_SIZE_LIMIT);
         }
+        formatAsHtml = true;
       } else {
         logger.warn("schedule has no message content", {
           scheduleId: schedule.id,
@@ -157,7 +164,11 @@ const handleScheduled = async (
       }
 
       for (const chunk of splitMessage(text)) {
-        await telegram.sendMessage({ chat_id: chatId, text: chunk });
+        await telegram.sendMessage({
+          chat_id: chatId,
+          text: formatAsHtml ? markdownToTelegramHtml(chunk) : chunk,
+          ...(formatAsHtml ? { parse_mode: "HTML" as const } : {}),
+        });
       }
 
       logger.info("scheduled message sent", {

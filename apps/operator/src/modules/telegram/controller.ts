@@ -13,6 +13,7 @@ import type { CreateScheduleInput } from "../../services/schedule";
 import { TelegramService } from "../../services/telegram";
 import type { AppEnv } from "../../types/env";
 import type { TelegramUpdate } from "../../types/telegram";
+import { markdownToTelegramHtml } from "../../utils/markdown-to-html";
 import { splitMessage } from "../../utils/message";
 import { validateSourceUrl } from "../../utils/url-validator";
 
@@ -259,7 +260,8 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
     for (const chunk of splitMessage(reply)) {
       await telegram.sendMessage({
         chat_id: chatId,
-        text: chunk,
+        text: markdownToTelegramHtml(chunk),
+        parse_mode: "HTML",
       });
     }
   } catch (error) {

@@ -11,6 +11,18 @@ vi.mock("openai", () => ({
   },
 }));
 
+const pendingGetMock = vi.fn();
+const pendingClearMock = vi.fn();
+const pendingSetMock = vi.fn();
+
+vi.mock("../../services/pending-action", () => ({
+  PendingActionService: class {
+    get = pendingGetMock;
+    clear = pendingClearMock;
+    set = pendingSetMock;
+  },
+}));
+
 import { onErrorHandler } from "../../middleware/error-handlers";
 import { loggerMiddleware } from "../../middleware/logger";
 import type { AppEnv } from "../../types/env";
@@ -79,6 +91,15 @@ describe("POST /webhook/telegram", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     ENV.DB = createMockD1();
+    pendingGetMock.mockReset();
+    pendingGetMock.mockResolvedValue(undefined);
+    pendingClearMock.mockReset();
+    pendingClearMock.mockResolvedValue(undefined);
+    pendingSetMock.mockReset();
+    pendingSetMock.mockResolvedValue(undefined);
+    openaiCreateMock.mockResolvedValue({
+      choices: [{ message: { content: "AI response" } }],
+    });
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         headers: { "Content-Type": "application/json" },
@@ -178,7 +199,7 @@ describe("POST /webhook/telegram", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("sends AI response for valid request", async () => {
+  it("sends AI response as HTML with parse_mode", async () => {
     const res = await sendRequest(validUpdate, {
       "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
     });
@@ -189,12 +210,43 @@ describe("POST /webhook/telegram", () => {
       `https://api.telegram.org/bot${ENV.TELEGRAM_BOT_TOKEN}/sendMessage`,
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ chat_id: 12345, text: "AI response" }),
+        body: JSON.stringify({
+          chat_id: 12345,
+          text: "AI response",
+          parse_mode: "HTML",
+        }),
       })
     );
   });
 
-  it("sends error message when OpenAI fails", async () => {
+  it("converts markdown in AI response to HTML before sending", async () => {
+    openaiCreateMock.mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: "# Title\n\nThis is **bold** and `code`.",
+          },
+        },
+      ],
+    });
+
+    const res = await sendRequest(validUpdate, {
+      "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+    });
+
+    expect(res.status).toBe(200);
+    const sentBody = JSON.parse(
+      (mockFetch.mock.calls[0][1] as { body: string }).body
+    ) as { text: string; parse_mode: string };
+    expect(sentBody.parse_mode).toBe("HTML");
+    expect(sentBody.text).toContain("<b>Title</b>");
+    expect(sentBody.text).toContain("<b>bold</b>");
+    expect(sentBody.text).toContain("<code>code</code>");
+    expect(sentBody.text).not.toContain("# Title");
+    expect(sentBody.text).not.toContain("**bold**");
+  });
+
+  it("sends error message as HTML when OpenAI fails", async () => {
     openaiCreateMock.mockRejectedValueOnce(
       new Error("401 insufficient permissions")
     );
@@ -212,6 +264,42 @@ describe("POST /webhook/telegram", () => {
         body: expect.stringContaining("Something went wrong") as string,
       })
     );
+    const sentBody = JSON.parse(
+      (mockFetch.mock.calls[0][1] as { body: string }).body
+    ) as { parse_mode: string };
+    expect(sentBody.parse_mode).toBe("HTML");
+  });
+
+  it("sends 'Action cancelled.' as plain text without parse_mode", async () => {
+    pendingGetMock.mockResolvedValueOnce({
+      type: "create_schedule",
+      payload: {},
+      description: "test action",
+    });
+
+    const update = {
+      ...validUpdate,
+      message: { ...validUpdate.message, text: "no" },
+    };
+
+    const res = await sendRequest(update, {
+      "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+    });
+
+    expect(res.status).toBe(200);
+    const cancellationCall = mockFetch.mock.calls.find((call) => {
+      const body = (call[1] as { body: string } | undefined)?.body;
+      return typeof body === "string" && body.includes("Action cancelled.");
+    });
+    expect(cancellationCall).toBeDefined();
+    if (!cancellationCall) {
+      return;
+    }
+    const body = JSON.parse(
+      (cancellationCall[1] as { body: string }).body
+    ) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("parse_mode");
+    expect(body.text).toBe("Action cancelled.");
   });
 
   it("returns 413 for oversized payloads", async () => {
