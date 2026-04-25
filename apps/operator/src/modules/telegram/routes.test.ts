@@ -246,7 +246,7 @@ describe("POST /webhook/telegram", () => {
     expect(sentBody.text).not.toContain("**bold**");
   });
 
-  it("sends error message as HTML when OpenAI fails", async () => {
+  it("sends error message as plain text when OpenAI fails", async () => {
     openaiCreateMock.mockRejectedValueOnce(
       new Error("401 insufficient permissions")
     );
@@ -257,17 +257,13 @@ describe("POST /webhook/telegram", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
-    expect(mockFetch).toHaveBeenCalledWith(
-      `https://api.telegram.org/bot${ENV.TELEGRAM_BOT_TOKEN}/sendMessage`,
-      expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining("Something went wrong") as string,
-      })
-    );
     const sentBody = JSON.parse(
       (mockFetch.mock.calls[0][1] as { body: string }).body
-    ) as { parse_mode: string };
-    expect(sentBody.parse_mode).toBe("HTML");
+    ) as Record<string, unknown>;
+    expect(sentBody).not.toHaveProperty("parse_mode");
+    expect(sentBody.text).toBe(
+      "Something went wrong while generating a response. Please try again."
+    );
   });
 
   it("sends 'Action cancelled.' as plain text without parse_mode", async () => {

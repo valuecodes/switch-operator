@@ -72,6 +72,27 @@ describe("markdownToTelegramHtml — happy path", () => {
     );
   });
 
+  it("preserves balanced parens inside URL (e.g. Wikipedia)", () => {
+    expect(
+      markdownToTelegramHtml("[wiki](https://en.wikipedia.org/wiki/Foo_(bar))")
+    ).toBe('<a href="https://en.wikipedia.org/wiki/Foo_(bar)">wiki</a>');
+  });
+
+  it("preserves balanced parens with text after the link", () => {
+    expect(
+      markdownToTelegramHtml(
+        "see [fn](https://docs.example.com/method(arg)) for details"
+      )
+    ).toBe(
+      'see <a href="https://docs.example.com/method(arg)">fn</a> for details'
+    );
+  });
+
+  it("falls through on double-nested parens (unsupported)", () => {
+    const out = markdownToTelegramHtml("[x](https://e.com/(a(b)c))");
+    expect(out).not.toContain("<a ");
+  });
+
   it("converts blockquote across multiple lines", () => {
     expect(markdownToTelegramHtml("> first\n> second")).toBe(
       "<blockquote>first\nsecond</blockquote>"

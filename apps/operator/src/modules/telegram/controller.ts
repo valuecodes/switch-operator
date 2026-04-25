@@ -14,7 +14,11 @@ import { TelegramService } from "../../services/telegram";
 import type { AppEnv } from "../../types/env";
 import type { TelegramUpdate } from "../../types/telegram";
 import { markdownToTelegramHtml } from "../../utils/markdown-to-html";
-import { splitMessage } from "../../utils/message";
+import {
+  splitMessage,
+  TELEGRAM_HTML_SAFE_LENGTH,
+  TELEGRAM_MAX_MESSAGE_LENGTH,
+} from "../../utils/message";
 import { validateSourceUrl } from "../../utils/url-validator";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -244,6 +248,7 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
   };
 
   let reply: string;
+  let replyIsHtml = true;
   try {
     const openai = new OpenAiService(c.env.OPENAI_API_KEY, logger);
     reply = await openai.replyWithTools(message.text, toolExecutor);
@@ -253,15 +258,19 @@ const handleWebhook = async (c: Context<AppEnv, string, WebhookInput>) => {
     });
     reply =
       "Something went wrong while generating a response. Please try again.";
+    replyIsHtml = false;
     await pendingService.clear(chatId);
   }
 
   try {
-    for (const chunk of splitMessage(reply)) {
+    const chunkMax = replyIsHtml
+      ? TELEGRAM_HTML_SAFE_LENGTH
+      : TELEGRAM_MAX_MESSAGE_LENGTH;
+    for (const chunk of splitMessage(reply, chunkMax)) {
       await telegram.sendMessage({
         chat_id: chatId,
-        text: markdownToTelegramHtml(chunk),
-        parse_mode: "HTML",
+        text: replyIsHtml ? markdownToTelegramHtml(chunk) : chunk,
+        ...(replyIsHtml ? { parse_mode: "HTML" as const } : {}),
       });
     }
   } catch (error) {
