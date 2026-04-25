@@ -1,13 +1,6 @@
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const isSafeUrl = (escapedUrl: string): boolean =>
-  /^https?:\/\//i.test(escapedUrl) &&
-  !/\s/.test(escapedUrl) &&
-  !escapedUrl.includes('"') &&
-  !escapedUrl.includes("&lt;") &&
-  !escapedUrl.includes("&gt;");
-
 const PLACEHOLDER_OPEN = "";
 const PLACEHOLDER_CLOSE = "";
 const PLACEHOLDER_RE = /P(\d+)/g;
@@ -36,17 +29,6 @@ const inlineConvert = (text: string, protectedSegments: string[]): string => {
 
   s = s.replace(/`([^`\n]+)`/g, (_m, content: string) =>
     protect(`<code>${content}</code>`)
-  );
-
-  s = s.replace(
-    /\[([^\]\n]+)\]\(((?:[^()\s]+|\([^()\s]*\))+)\)/g,
-    (_m, label: string, url: string) => {
-      if (!isSafeUrl(url)) {
-        return `${label} (${url})`;
-      }
-      const formattedLabel = applyEmphasis(label);
-      return protect(`<a href="${url}">${formattedLabel}</a>`);
-    }
   );
 
   s = applyEmphasis(s);
