@@ -6,10 +6,7 @@
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm test:*)",
       "Bash(pnpm format:*)",
-      "Bash(pnpm --filter * test*)",
-      "Bash(pnpm --filter * lint*)",
-      "Bash(pnpm --filter * typecheck*)",
-      "Bash(pnpm --filter * format*)"
+      "Bash(pnpm --filter:*)"
     ]
   }
 }
