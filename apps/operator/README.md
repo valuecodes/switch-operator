@@ -31,7 +31,7 @@ Run commands from the repo root unless noted otherwise.
 - The webhook body is limited to 64 KiB and validated against the Telegram update schema
 - Messages from the allowed Telegram chat are forwarded to OpenAI
 - The assistant can create, list, and delete scheduled reminders through tool calls
-- Schedule creation and deletion require a `YES` confirmation reply within two minutes
+- Schedule creation and deletion require confirmation within two minutes via inline ✅/❌ buttons (typing `YES` still works as a fallback)
 - A cron trigger runs every minute and executes due reminders and web monitors from D1
 - Monitor schedules scrape a URL, analyze the content with OpenAI, and notify only when the condition matches
 

@@ -40,6 +40,7 @@ const pendingActions = sqliteTable("pending_actions", {
   payload: text("payload").notNull(),
   description: text("description").notNull(),
   expiresAt: text("expires_at").notNull(),
+  token: text("token"),
 });
 
 export { pendingActions, schedules };

@@ -81,7 +81,11 @@ const main = async () => {
   try {
     const result = await client.post("/setWebhook", {
       schema: responseSchema,
-      body: { url: webhookUrl, secret_token: secret },
+      body: {
+        url: webhookUrl,
+        secret_token: secret,
+        allowed_updates: ["message", "callback_query"],
+      },
     });
     console.log("Response:", JSON.stringify(result, null, 2));
 
