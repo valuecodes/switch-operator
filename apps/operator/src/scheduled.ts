@@ -22,6 +22,24 @@ type Env = AppEnv["Bindings"];
 
 const RESPONSE_SIZE_LIMIT = 1024 * 1024; // 1MB
 
+const describeErrorCause = (error: unknown): string | undefined => {
+  if (!(error instanceof Error) || error.cause === undefined) {
+    return undefined;
+  }
+  const { cause } = error;
+  if (cause instanceof Error) {
+    return cause.message;
+  }
+  if (typeof cause === "string") {
+    return cause;
+  }
+  try {
+    return JSON.stringify(cause);
+  } catch {
+    return undefined;
+  }
+};
+
 const handleScheduled = async (
   _event: ScheduledEvent,
   env: Env,
@@ -39,11 +57,13 @@ const handleScheduled = async (
   } catch (error) {
     logger.error("failed to claim due schedules", {
       error: error instanceof Error ? error.message : String(error),
+      cause: describeErrorCause(error),
     });
     return;
   }
 
   if (claimed.length === 0) {
+    logger.info("no due schedules");
     return;
   }
 
