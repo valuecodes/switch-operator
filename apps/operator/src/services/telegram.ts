@@ -1,7 +1,11 @@
 import { HttpClient } from "@repo/http-client";
 import type { Logger } from "@repo/logger";
 
-import type { SendMessageParams } from "../types/telegram";
+import type {
+  AnswerCallbackQueryParams,
+  EditMessageReplyMarkupParams,
+  SendMessageParams,
+} from "../types/telegram";
 import { telegramApiResponseSchema } from "../types/telegram";
 
 class TelegramService {
@@ -33,7 +37,19 @@ class TelegramService {
   }
 
   async setWebhook(url: string, secretToken?: string) {
-    return this.request("setWebhook", { url, secret_token: secretToken });
+    return this.request("setWebhook", {
+      url,
+      secret_token: secretToken,
+      allowed_updates: ["message", "callback_query"],
+    });
+  }
+
+  async answerCallbackQuery(params: AnswerCallbackQueryParams) {
+    return this.request("answerCallbackQuery", params);
+  }
+
+  async editMessageReplyMarkup(params: EditMessageReplyMarkupParams) {
+    return this.request("editMessageReplyMarkup", params);
   }
 }
 

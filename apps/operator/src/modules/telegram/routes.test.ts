@@ -11,13 +11,15 @@ vi.mock("openai", () => ({
   },
 }));
 
-const pendingGetMock = vi.fn();
+const pendingConsumeByChatIdMock = vi.fn();
+const pendingConsumeByTokenMock = vi.fn();
 const pendingClearMock = vi.fn();
 const pendingSetMock = vi.fn();
 
 vi.mock("../../services/pending-action", () => ({
   PendingActionService: class {
-    get = pendingGetMock;
+    consumeByChatId = pendingConsumeByChatIdMock;
+    consumeByToken = pendingConsumeByTokenMock;
     clear = pendingClearMock;
     set = pendingSetMock;
   },
@@ -65,6 +67,33 @@ const validUpdate = {
   },
 };
 
+const callbackUpdate = (overrides: {
+  data?: string;
+  fromId?: number;
+  chatId?: number;
+  messageId?: number;
+  includeMessage?: boolean;
+}) => {
+  const includeMessage = overrides.includeMessage ?? true;
+  return {
+    update_id: 2,
+    callback_query: {
+      id: "cb-1",
+      from: { id: overrides.fromId ?? 12345, is_bot: false, first_name: "U" },
+      data: overrides.data ?? "c:tok123",
+      ...(includeMessage
+        ? {
+            message: {
+              message_id: overrides.messageId ?? 99,
+              chat: { id: overrides.chatId ?? 12345, type: "private" },
+              date: 1234567890,
+            },
+          }
+        : {}),
+    },
+  };
+};
+
 const app = new Hono<AppEnv>();
 app.use("*", loggerMiddleware);
 app.onError(onErrorHandler);
@@ -91,19 +120,23 @@ describe("POST /webhook/telegram", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     ENV.DB = createMockD1();
-    pendingGetMock.mockReset();
-    pendingGetMock.mockResolvedValue(undefined);
+    pendingConsumeByChatIdMock.mockReset();
+    pendingConsumeByChatIdMock.mockResolvedValue(undefined);
+    pendingConsumeByTokenMock.mockReset();
+    pendingConsumeByTokenMock.mockResolvedValue(undefined);
     pendingClearMock.mockReset();
     pendingClearMock.mockResolvedValue(undefined);
     pendingSetMock.mockReset();
-    pendingSetMock.mockResolvedValue(undefined);
+    pendingSetMock.mockResolvedValue("tok-default");
     openaiCreateMock.mockResolvedValue({
       choices: [{ message: { content: "AI response" } }],
     });
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), {
-        headers: { "Content-Type": "application/json" },
-      })
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json" },
+        })
+      )
     );
   });
 
@@ -266,8 +299,8 @@ describe("POST /webhook/telegram", () => {
     );
   });
 
-  it("sends 'Action cancelled.' as plain text without parse_mode", async () => {
-    pendingGetMock.mockResolvedValueOnce({
+  it("sends 'Action cancelled.' as plain text without parse_mode for typed non-YES reply", async () => {
+    pendingConsumeByChatIdMock.mockResolvedValueOnce({
       type: "create_schedule",
       payload: {},
       description: "test action",
@@ -382,5 +415,200 @@ describe("POST /webhook/telegram", () => {
       .map(([entry]) => String(entry))
       .join("\n");
     expect(output).not.toContain("99999");
+  });
+});
+
+describe("POST /webhook/telegram — callback_query", () => {
+  const headers = {
+    "x-telegram-bot-api-secret-token": ENV.TELEGRAM_WEBHOOK_SECRET,
+  };
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    ENV.DB = createMockD1();
+    pendingConsumeByChatIdMock.mockReset();
+    pendingConsumeByChatIdMock.mockResolvedValue(undefined);
+    pendingConsumeByTokenMock.mockReset();
+    pendingConsumeByTokenMock.mockResolvedValue(undefined);
+    pendingClearMock.mockReset();
+    pendingClearMock.mockResolvedValue(undefined);
+    pendingSetMock.mockReset();
+    pendingSetMock.mockResolvedValue("tok-default");
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const fetchedMethods = (): string[] =>
+    mockFetch.mock.calls.map((call) => {
+      const url = call[0] as string;
+      return url.split("/").pop() ?? "";
+    });
+
+  it("ignores callback_query from disallowed user", async () => {
+    const res = await sendRequest(
+      callbackUpdate({ fromId: 99999, data: "c:tok-x" }),
+      headers
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pendingConsumeByTokenMock).not.toHaveBeenCalled();
+  });
+
+  it("ignores callback_query from disallowed chat", async () => {
+    const res = await sendRequest(
+      callbackUpdate({ chatId: 99999, data: "c:tok-x" }),
+      headers
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pendingConsumeByTokenMock).not.toHaveBeenCalled();
+  });
+
+  it("acks but does nothing when callback has no message field", async () => {
+    const res = await sendRequest(
+      callbackUpdate({ includeMessage: false, data: "c:tok-x" }),
+      headers
+    );
+
+    expect(res.status).toBe(200);
+    expect(pendingConsumeByTokenMock).not.toHaveBeenCalled();
+    expect(fetchedMethods()).toContain("answerCallbackQuery");
+    expect(fetchedMethods()).not.toContain("editMessageReplyMarkup");
+    expect(fetchedMethods()).not.toContain("sendMessage");
+  });
+
+  it("acks and ignores malformed callback_data", async () => {
+    const res = await sendRequest(callbackUpdate({ data: "garbage" }), headers);
+
+    expect(res.status).toBe(200);
+    expect(pendingConsumeByTokenMock).not.toHaveBeenCalled();
+    expect(fetchedMethods()).toContain("answerCallbackQuery");
+  });
+
+  it("expired/unknown token: acks with toast and clears buttons, no execution", async () => {
+    pendingConsumeByTokenMock.mockResolvedValueOnce(undefined);
+
+    const res = await sendRequest(
+      callbackUpdate({ data: "c:tok-stale" }),
+      headers
+    );
+
+    expect(res.status).toBe(200);
+    const ackCall = mockFetch.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+    );
+    expect(ackCall).toBeDefined();
+    if (!ackCall) {
+      return;
+    }
+    const ackBody = JSON.parse((ackCall[1] as { body: string }).body) as Record<
+      string,
+      unknown
+    >;
+    expect(ackBody.text).toBe("Expired or already used");
+
+    const editCall = mockFetch.mock.calls.find(
+      (c) =>
+        typeof c[0] === "string" && c[0].endsWith("/editMessageReplyMarkup")
+    );
+    expect(editCall).toBeDefined();
+    const sendCall = mockFetch.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].endsWith("/sendMessage")
+    );
+    expect(sendCall).toBeUndefined();
+  });
+
+  it("cancel: acks with 'Cancelled', clears buttons, no execution", async () => {
+    pendingConsumeByTokenMock.mockResolvedValueOnce({
+      type: "create_schedule",
+      payload: {},
+      description: "any",
+    });
+
+    const res = await sendRequest(callbackUpdate({ data: "x:tok-1" }), headers);
+
+    expect(res.status).toBe(200);
+    expect(pendingConsumeByTokenMock).toHaveBeenCalledWith(12345, "tok-1");
+    const ackCall = mockFetch.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+    );
+    expect(ackCall).toBeDefined();
+    if (!ackCall) {
+      return;
+    }
+    const ackBody = JSON.parse((ackCall[1] as { body: string }).body) as Record<
+      string,
+      unknown
+    >;
+    expect(ackBody.text).toBe("Cancelled");
+    const sendCall = mockFetch.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].endsWith("/sendMessage")
+    );
+    expect(sendCall).toBeUndefined();
+  });
+
+  it("confirm delete: acks 'Schedule deleted' and sends result message", async () => {
+    pendingConsumeByTokenMock.mockResolvedValueOnce({
+      type: "delete_schedule",
+      payload: { id: "abc" },
+      description: "Delete schedule abc",
+    });
+    const removeMock = vi.fn().mockResolvedValue(true);
+    const { ScheduleService } = await import("../../services/schedule");
+    vi.spyOn(ScheduleService.prototype, "remove").mockImplementation(
+      removeMock
+    );
+
+    const res = await sendRequest(callbackUpdate({ data: "c:tok-1" }), headers);
+
+    expect(res.status).toBe(200);
+    expect(removeMock).toHaveBeenCalledWith("abc", 12345);
+    const ackCall = mockFetch.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+    );
+    expect(ackCall).toBeDefined();
+    if (!ackCall) {
+      return;
+    }
+    const ackBody = JSON.parse((ackCall[1] as { body: string }).body) as Record<
+      string,
+      unknown
+    >;
+    expect(ackBody.text).toBe("Schedule deleted");
+    const sendCall = mockFetch.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].endsWith("/sendMessage")
+    );
+    expect(sendCall).toBeDefined();
+  });
+
+  it("double-tap: second consumeByToken returns undefined → no double execution", async () => {
+    pendingConsumeByTokenMock
+      .mockResolvedValueOnce({
+        type: "delete_schedule",
+        payload: { id: "abc" },
+        description: "Delete schedule abc",
+      })
+      .mockResolvedValueOnce(undefined);
+    const removeMock = vi.fn().mockResolvedValue(true);
+    const { ScheduleService } = await import("../../services/schedule");
+    vi.spyOn(ScheduleService.prototype, "remove").mockImplementation(
+      removeMock
+    );
+
+    await sendRequest(callbackUpdate({ data: "c:tok-1" }), headers);
+    await sendRequest(callbackUpdate({ data: "c:tok-1" }), headers);
+
+    expect(removeMock).toHaveBeenCalledTimes(1);
   });
 });

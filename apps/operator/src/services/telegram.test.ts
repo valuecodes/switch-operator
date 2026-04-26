@@ -88,6 +88,7 @@ describe("TelegramService", () => {
           body: JSON.stringify({
             url: "https://example.com/webhook",
             secret_token: "my-secret",
+            allowed_updates: ["message", "callback_query"],
           }),
         }
       );
@@ -99,6 +100,82 @@ describe("TelegramService", () => {
       const result = await service.setWebhook("https://example.com/webhook");
 
       expect(result).toEqual({ ok: true });
+    });
+  });
+
+  describe("answerCallbackQuery", () => {
+    it("posts to /answerCallbackQuery with the given params", async () => {
+      mockFetch.mockResolvedValueOnce(createJsonResponse({ ok: true }));
+
+      await service.answerCallbackQuery({
+        callback_query_id: "cb-1",
+        text: "Done",
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `https://api.telegram.org/bot${token}/answerCallbackQuery`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callback_query_id: "cb-1", text: "Done" }),
+        }
+      );
+    });
+  });
+
+  describe("editMessageReplyMarkup", () => {
+    it("posts to /editMessageReplyMarkup with chat and message ids", async () => {
+      mockFetch.mockResolvedValueOnce(createJsonResponse({ ok: true }));
+
+      await service.editMessageReplyMarkup({ chat_id: 1, message_id: 2 });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `https://api.telegram.org/bot${token}/editMessageReplyMarkup`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: 1, message_id: 2 }),
+        }
+      );
+    });
+  });
+
+  describe("sendMessage with reply_markup", () => {
+    it("includes inline keyboard in the body", async () => {
+      mockFetch.mockResolvedValueOnce(createJsonResponse({ ok: true }));
+
+      await service.sendMessage({
+        chat_id: 1,
+        text: "Confirm?",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "Yes", callback_data: "c:t1" },
+              { text: "No", callback_data: "x:t1" },
+            ],
+          ],
+        },
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `https://api.telegram.org/bot${token}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: 1,
+            text: "Confirm?",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "Yes", callback_data: "c:t1" },
+                  { text: "No", callback_data: "x:t1" },
+                ],
+              ],
+            },
+          }),
+        }
+      );
     });
   });
 });
