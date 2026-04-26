@@ -1,10 +1,10 @@
 ---
 description: Open a GitHub PR for the current branch with an auto-generated title and body
-allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(git push:*), Bash(gh auth status:*), Bash(gh pr create:*), Bash(gh pr view:*), Bash(gh repo view:*)
+allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(gh auth status:*), Bash(gh pr create:*), Bash(gh pr view:*), Bash(gh repo view:*)
 argument-hint: [--draft]
 ---
 
-Open a GitHub PR for the current branch. Generate the title + body, show them to me, confirm, then push + create.
+Open a GitHub PR for the current branch. Generate the title + body, show them to the user, get confirmation, then create the PR. The user pushes the branch themselves — never run `git push`.
 
 Arguments: `$ARGUMENTS` — if it contains `--draft`, create the PR as draft.
 
@@ -17,7 +17,8 @@ Stop with a clear message if any of these fail:
 3. Determine base branch: try `main`, fall back to `master`. If neither exists, stop.
 4. `git log <base>..HEAD --oneline` — if empty, stop ("nothing to PR").
 5. `gh pr view --json url,state` on the current branch — if a PR already exists, print its URL and stop. Do NOT create a duplicate.
-6. `git status --porcelain` — if there are uncommitted changes, warn me but do NOT commit them.
+6. `git status --porcelain` — if there are uncommitted changes, warn the user but do NOT commit them.
+7. Verify the branch is on the remote with `gh api repos/{owner}/{repo}/branches/<current-branch>` (or equivalent) — if it 404s, stop and tell the user to push first. Do NOT push for them.
 
 ## Generate
 
@@ -38,16 +39,15 @@ Run `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`, then produce:
 
 ## Confirm
 
-Show me the title and body in two separate fenced code blocks. Then ASK explicitly: `Open this PR? (yes / edit / cancel)`. Wait for my reply. Do NOT push or create the PR without my confirmation.
+Show the user the title and body in two separate fenced code blocks. Then ASK explicitly: `Open this PR? (yes / edit / cancel)`. Wait for the user's reply. Do NOT create the PR without confirmation.
 
-If I say "edit", let me edit, then re-confirm.
+If the user says "edit", let them edit, then re-confirm.
 
 ## Create
 
 On confirmation:
 
-1. Push the branch with `git push -u origin <current-branch>` (skip if `git status -sb` shows the branch is already published and up to date).
-2. Run `gh pr create --base <base> --title "<title>" --body "$(cat <<'EOF' ... EOF)"` — pass the body via heredoc so newlines survive. Add `--draft` if requested.
-3. Print the PR URL that `gh` returns.
+1. Run `gh pr create --base <base> --title "<title>" --body "$(cat <<'EOF' ... EOF)"` — pass the body via heredoc so newlines survive. Add `--draft` if requested.
+2. Print the PR URL that `gh` returns.
 
-Do not commit on my behalf. Do not push without confirmation. Do not skip the confirmation step.
+Do not commit on the user's behalf. Do not push under any circumstances — the user pushes the branch before invoking this command. Do not skip the confirmation step.
