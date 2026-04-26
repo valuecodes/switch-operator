@@ -1,6 +1,6 @@
 ---
 description: Triage outdated pnpm packages, research what each upgrade entails, then update the approved set
-allowed-tools: Bash(pnpm outdated:*), Bash(pnpm up:*), Bash(pnpm typecheck:*), Bash(pnpm lint:*), Bash(pnpm test:*), Bash(pnpm build:*), Bash(git status:*), Bash(git diff:*), Bash(cat:*), Bash(jq:*), Read, WebSearch, WebFetch
+allowed-tools: Bash(pnpm outdated:*), Bash(pnpm up:*), Bash(pnpm typecheck:*), Bash(pnpm lint:*), Bash(pnpm test:*), Bash(pnpm build:*), Bash(git status:*), Bash(git diff:*), Bash(cat:*), Bash(jq:*), Read, WebSearch, WebFetch, AskUserQuestion
 argument-hint: [--dev | --prod]
 ---
 
@@ -73,11 +73,13 @@ pnpm up --latest -r <pkg1> <pkg2> ...
 
 If the list is empty (only `hold` rows), say so and stop — nothing to upgrade automatically.
 
-**Gate.** Ask exactly: `Run this update? (yes / edit / cancel)`. Wait for my reply.
+**Gate.** Call the `AskUserQuestion` tool with the question `Run this update?` and these three options (in this exact order):
 
-- `yes` → proceed.
-- `edit` → let me reclassify rows (e.g. "move <pkg> to hold", "add <pkg> back in"), then re-show the command and re-confirm.
-- `cancel` → stop without running anything.
+1. `Run update (Recommended)` — proceeds to section 6.
+2. `Edit list` — let the user reclassify rows (e.g. "move <pkg> to hold", "add <pkg> back in"), then re-show the command and re-ask.
+3. `Cancel` — stop without running anything.
+
+Do not run `pnpm up` without an affirmative answer from `AskUserQuestion`.
 
 ## 6. Apply (only after gate = yes)
 

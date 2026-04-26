@@ -1,6 +1,6 @@
 ---
 description: Open a GitHub PR for the current branch with an auto-generated title and body
-allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(gh auth status:*), Bash(gh pr create:*), Bash(gh pr view:*), Bash(gh repo view:*)
+allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(gh auth status:*), Bash(gh pr create:*), Bash(gh pr view:*), Bash(gh repo view:*), AskUserQuestion
 argument-hint: [--draft]
 ---
 
@@ -39,9 +39,13 @@ Run `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`, then produce:
 
 ## Confirm
 
-Show the user the title and body in two separate fenced code blocks. Then ASK explicitly: `Open this PR? (yes / edit / cancel)`. Wait for the user's reply. Do NOT create the PR without confirmation.
+Show the user the title and body in two separate fenced code blocks. Then call the `AskUserQuestion` tool with the question `Open this PR?` and these three options (in this exact order):
 
-If the user says "edit", let them edit, then re-confirm.
+1. `Open PR (Recommended)` — proceeds to the Create step.
+2. `Edit first` — let the user edit the title/body, then re-confirm.
+3. `Cancel` — stop without creating the PR.
+
+Do NOT create the PR without an affirmative answer from `AskUserQuestion`.
 
 ## Create
 
