@@ -1,6 +1,6 @@
 ---
 description: Triage PR review comments, fix the valid ones, then reply to each comment (manual commit + push)
-allowed-tools: Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr comment:*), Bash(gh api:*), Bash(gh repo view:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(pnpm:*)
+allowed-tools: Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr comment:*), Bash(gh api:*), Bash(gh repo view:*), Bash(gh run view:*), Bash(gh run list:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(pnpm:*)
 argument-hint: [PR-number]
 ---
 
@@ -14,9 +14,9 @@ If `$ARGUMENTS` is a number, use that PR. Otherwise `gh pr view --json number,he
 
 Capture `<owner>` and `<repo>` from `gh repo view --json owner,name`.
 
-## 2. Fetch comments (read-only)
+## 2. Fetch comments + checks (read-only)
 
-Pull all three sources, retaining each comment's `id` (needed to reply):
+Comments — pull all three sources, retaining each comment's `id` (needed to reply):
 
 - General PR comments: `gh api repos/<owner>/<repo>/issues/<PR>/comments`
 - Review / line comments: `gh api repos/<owner>/<repo>/pulls/<PR>/comments`
@@ -24,23 +24,36 @@ Pull all three sources, retaining each comment's `id` (needed to reply):
 
 Skip any comment authored by the current `gh api user --jq .login` (don't re-engage your own past replies).
 
+Checks — run `gh pr checks` (exit code 8 means "not all complete", that's fine, parse the output anyway). For each check that finished with `failure`, fetch the tail of the failed job log:
+
+```
+gh run view <runId> --log-failed | tail -60
+```
+
+Cap at 60 lines per failure; truncate longer with a note pointing at the check URL.
+
 ## 3. Triage
 
-Classify each comment:
+First, print a one-line check summary: `Checks: <N> ✓ · <N> ✗ · <N> ⏳`. If everything is passing or pending, say so.
 
-- **valid** — concrete claim or actionable suggestion grounded in the diff. Will be fixed.
+Then classify each comment AND each failed check:
+
+- **valid** — concrete claim or actionable suggestion grounded in the diff. Will be fixed. Replies posted.
 - **question** — clarifying question; no code change, but reply needed.
-- **noise** — bot welcome / "review enabled" / auto-generated PR overview / "show summary per file". No fix, no reply by default.
+- **noise** — bot welcome / "review enabled" / auto-generated PR overview / "show summary per file" / known-flaky CI failure. No fix, no reply by default.
 - **approved** — APPROVED review with no concrete request. Acknowledge with `👍 thanks`, no fix.
+- **ci-failure** — a failed Action / check that points at a real problem in the diff (test/typecheck/lint/format). Will be fixed. NO reply (CI re-runs after push).
+
+For ci-failure rows use the check name as `AUTHOR` and the failed-job URL as the `id`. Put a one-line root cause (parsed from the failed log tail) in the summary.
 
 Show one table:
 
 ```
-ID           AUTHOR                FILE:LINE                  CLASS     ONE-LINE SUMMARY
-<id>         <user>                <path:line | -->           <class>   <≤ 90 chars>
+ID           AUTHOR                FILE:LINE                  CLASS         ONE-LINE SUMMARY
+<id>         <user | check-name>   <path:line | -->           <class>       <≤ 90 chars>
 ```
 
-Then propose a fix plan for everything classified `valid`:
+Then propose a fix plan for everything classified `valid` or `ci-failure`:
 
 ```
 [id <id>]  <file>(:line)
@@ -84,13 +97,14 @@ On `yes`, do NOT commit and do NOT push. Instead:
 
 ## 5. Draft replies (only after Gate 2 = yes)
 
-For each comment classified `valid`, `question`, or `approved`, write a reply.
+For each row classified `valid`, `question`, or `approved`, write a reply. Skip `ci-failure` (CI re-runs after push) and `noise` (silence).
 
 Style: terse, one or two sentences max. Per-class template:
 
 - `valid` → `Fixed in <sha>: <one-line of what changed>.` Optionally a brief follow-up if the fix isn't 1:1 to the suggestion.
 - `question` → answer directly. Don't speculate. If the answer is "this is intentional because X", say that.
 - `approved` → `👍 thanks`.
+- `ci-failure` → no reply.
 - `noise` → no reply.
 
 Show all drafts in one block, grouped by comment id.
@@ -110,7 +124,7 @@ After each post, confirm it returned a 200/201. If any fail, list exactly which 
 
 Print:
 
-- `Triaged: <N>  Fixed: <N>  Replied: <N>  Skipped (noise): <N>`
+- `Triaged: <N>  Fixed: <N> (review + <N> ci)  Replied: <N>  Skipped (noise): <N>`
 - Commit SHA(s)
 - PR URL
 
