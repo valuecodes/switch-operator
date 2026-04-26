@@ -117,13 +117,19 @@ const handleScheduled = async (
             logger.info("monitor keyword check — no matches, skipping", {
               scheduleId: schedule.id,
             });
-            await scheduleService.updateState(
-              schedule.id,
+            const { lockLost } = await scheduleService.updateState(
+              schedule,
               JSON.stringify({
                 lastContent: `No keyword matches found in scraped content.${scrapeResult.truncated ? " Scraped content was truncated before keyword matching." : ""}`,
                 lastScrapedAt: now.toISOString(),
               })
             );
+            if (lockLost) {
+              logger.warn(
+                "lock lost during monitor execution; state update skipped",
+                { scheduleId: schedule.id }
+              );
+            }
             return;
           }
           scrapedContent = extractWindows(sourceContent, positions, 2000);
@@ -161,13 +167,19 @@ const handleScheduled = async (
           });
         }
 
-        await scheduleService.updateState(
-          schedule.id,
+        const { lockLost } = await scheduleService.updateState(
+          schedule,
           JSON.stringify({
             lastContent: analysis.newState,
             lastScrapedAt: now.toISOString(),
           })
         );
+        if (lockLost) {
+          logger.warn(
+            "lock lost during monitor execution; state update skipped",
+            { scheduleId: schedule.id }
+          );
+        }
         return;
       }
 
@@ -214,10 +226,7 @@ const handleScheduled = async (
     const result = results[i];
     const schedule = claimed[i];
     if (result.status === "fulfilled") {
-      const { lockLost } = await scheduleService.markSuccess(
-        schedule,
-        completionTime
-      );
+      const { lockLost } = await scheduleService.markSuccess(schedule);
       if (lockLost) {
         logger.warn("lock lost before recording success", {
           scheduleId: schedule.id,
