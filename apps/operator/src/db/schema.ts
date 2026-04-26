@@ -23,6 +23,7 @@ const schedules = sqliteTable(
     description: text("description").notNull(),
     active: int("active", { mode: "boolean" }).notNull().default(true),
     nextRunAt: text("next_run_at").notNull(),
+    claimedAt: text("claimed_at"),
     retryCount: int("retry_count").notNull().default(0),
     createdAt: text("created_at")
       .notNull()

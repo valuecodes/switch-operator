@@ -1,0 +1,1 @@
+ALTER TABLE `schedules` ADD `claimed_at` text;
