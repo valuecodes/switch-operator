@@ -1,6 +1,6 @@
 ---
 description: Triage PR review comments, fix the valid ones, then reply to each comment (manual commit + push)
-allowed-tools: Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr comment:*), Bash(gh api:*), Bash(gh repo view:*), Bash(gh run view:*), Bash(gh run list:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(pnpm:*)
+allowed-tools: Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr comment:*), Bash(gh api:*), Bash(gh repo view:*), Bash(gh run view:*), Bash(gh run list:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(pnpm:*), AskUserQuestion
 argument-hint: [PR-number]
 ---
 
@@ -62,9 +62,11 @@ Then propose a fix plan for everything classified `valid` or `ci-failure`:
 
 Group related fixes (same file or shared root cause) into a single edit when natural.
 
-**GATE 1.** Ask exactly: `Triage + fix plan look right? (yes / edit / cancel)`. Wait.
+**GATE 1.** Call `AskUserQuestion` with the question `Triage + fix plan look right?` and these three options (in this exact order):
 
-If `edit`: let me reclassify (e.g. "id 1234 is noise") or adjust the plan, then re-confirm.
+1. `Apply fixes (Recommended)` — proceeds to section 4.
+2. `Edit triage` — let the user reclassify (e.g. "id 1234 is noise") or adjust the plan, then re-ask.
+3. `Cancel` — stop without applying anything.
 
 ## 4. Apply fixes (only after Gate 1 = yes)
 
@@ -80,9 +82,13 @@ If `edit`: let me reclassify (e.g. "id 1234 is noise") or adjust the plan, then 
    If any fail, STOP and show the failure. Do not commit broken code, do not post replies promising a non-existent fix.
 4. Show me the diff (`git diff`) for review.
 
-**GATE 2.** Ask: `Fixes look right? (yes / edit / cancel)`. Wait.
+**GATE 2.** Call `AskUserQuestion` with the question `Fixes look right?` and these three options (in this exact order):
 
-On `yes`, do NOT commit and do NOT push. Instead:
+1. `Looks good (Recommended)` — proceeds to draft commit message.
+2. `Edit fixes` — let the user request adjustments, then re-validate and re-ask.
+3. `Cancel` — stop; leave the working tree dirty for the user.
+
+On the affirmative answer, do NOT commit and do NOT push. Instead:
 
 5. Print a suggested commit message I can copy-paste:
 
@@ -109,7 +115,11 @@ Style: terse, one or two sentences max. Per-class template:
 
 Show all drafts in one block, grouped by comment id.
 
-**GATE 3.** Ask: `Post these replies (and resolve threads for fix-landed rows)? (yes / edit / cancel)`. Wait.
+**GATE 3.** Call `AskUserQuestion` with the question `Post these replies (and resolve threads for fix-landed rows)?` and these three options (in this exact order):
+
+1. `Post replies (Recommended)` — proceeds to section 6.
+2. `Edit drafts` — let the user revise specific replies, then re-ask.
+3. `Cancel` — stop without posting anything.
 
 ## 6. Post replies + resolve threads (only after Gate 3 = yes)
 
