@@ -25,7 +25,7 @@ Run `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`, then produce:
 
 - **Title**: plain English sentence (NOT `<type>: <subject>` semantic format). Capitalized, present tense, ≤ 72 chars, no trailing period.
 - **Body**: three sections, total ~15–25 lines, skim-friendly.
-  - `### What`: 2–4 short bullets. Lead with the *why* (bug, gap, user need), then key changes. No opening paragraph. Skip anything obvious from the diff.
+  - `### What`: 2–4 short bullets. Lead with the _why_ (bug, gap, user need), then key changes. No opening paragraph. Skip anything obvious from the diff.
   - `### How to test`: commands one per line, no prose, no "expected results". Use only scripts that exist in `package.json` (verify first). Prefix manual steps with `Recommended:` if you didn't run them.
   - `### Security review`: default to single line `No security-impacting changes.` Expand to checklist only when an item is actually affected. Format when expanded:
     - **Secrets / env vars:** <what changed>
