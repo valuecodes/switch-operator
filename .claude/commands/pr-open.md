@@ -1,6 +1,6 @@
 ---
 description: Open a GitHub PR for the current branch with an auto-generated title and body
-allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(gh auth status:*), Bash(gh pr create:*), Bash(gh pr view:*), Bash(gh repo view:*), AskUserQuestion
+allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*), Bash(git rev-parse:*), Bash(git branch:*), Bash(gh auth status:*), Bash(gh api:*), Bash(gh pr create:*), Bash(gh pr view:*), Bash(gh repo view:*), AskUserQuestion
 argument-hint: [--draft]
 ---
 
