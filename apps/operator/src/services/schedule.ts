@@ -397,10 +397,20 @@ class ScheduleService {
         row.claimedAt === null
           ? isNull(schedules.claimedAt)
           : eq(schedules.claimedAt, row.claimedAt);
+      // Also guard on nextRunAt: if a concurrent worker completed this row
+      // between SELECT and UPDATE (advancing nextRunAt and clearing claimedAt
+      // back to NULL), the lockGuard alone would let us reclaim a row that's
+      // no longer due, causing duplicate execution.
       const result = await this.db
         .update(schedules)
         .set({ claimedAt: nowIso })
-        .where(and(eq(schedules.id, row.id), lockGuard));
+        .where(
+          and(
+            eq(schedules.id, row.id),
+            eq(schedules.nextRunAt, row.nextRunAt),
+            lockGuard
+          )
+        );
       if (result.meta.changes > 0) {
         claimed.push({ ...row, claimedAt: nowIso });
       }
@@ -416,7 +426,10 @@ class ScheduleService {
     const update = exhausted
       ? {
           // Skip this slot, reset for the next regular occurrence.
-          nextRunAt: this.nextOccurrence(row, now).toISOString(),
+          // Compute next from row.nextRunAt (the slot we just attempted),
+          // not from `now`, so a long-running batch never silently jumps
+          // past intermediate occurrences for short-interval schedules.
+          nextRunAt: this.nextOccurrence(row).toISOString(),
           retryCount: 0,
           claimedAt: null,
         }
@@ -441,11 +454,11 @@ class ScheduleService {
     return { exhausted, lockLost: false };
   }
 
-  async markSuccess(row: ClaimedSchedule, now: Date) {
+  async markSuccess(row: ClaimedSchedule) {
     const result = await this.db
       .update(schedules)
       .set({
-        nextRunAt: this.nextOccurrence(row, now).toISOString(),
+        nextRunAt: this.nextOccurrence(row).toISOString(),
         retryCount: 0,
         claimedAt: null,
       })
@@ -455,24 +468,47 @@ class ScheduleService {
     return { lockLost: result.meta.changes === 0 };
   }
 
-  private nextOccurrence(row: ClaimedSchedule, now: Date): Date {
-    return computeNextRun(row.scheduleType, row.timezone, now, {
-      hour: row.hour ?? undefined,
-      minute: row.minute ?? undefined,
-      dayOfWeek: row.dayOfWeek ?? undefined,
-      dayOfMonth: row.dayOfMonth ?? undefined,
-    });
+  /**
+   * Compute the next occurrence relative to row.nextRunAt (the slot just
+   * processed), not relative to wall-clock `now`. This guarantees we always
+   * advance to the next strictly-later occurrence, so a long-running batch
+   * for a short-interval schedule (e.g. hourly) never skips intermediate
+   * occurrences.
+   */
+  private nextOccurrence(row: ClaimedSchedule): Date {
+    return computeNextRun(
+      row.scheduleType,
+      row.timezone,
+      new Date(row.nextRunAt),
+      {
+        hour: row.hour ?? undefined,
+        minute: row.minute ?? undefined,
+        dayOfWeek: row.dayOfWeek ?? undefined,
+        dayOfMonth: row.dayOfMonth ?? undefined,
+      }
+    );
   }
 
-  async updateState(id: string, stateJson: string) {
+  /**
+   * Lock-guarded state write. The UPDATE only succeeds if the caller still
+   * owns the lock (claimed_at matches the value they were given at claim
+   * time). Without this, a long-running worker that lost ownership to a
+   * stale-lock reclaim could overwrite a newer worker's state. Returns
+   * `{ lockLost: true }` so the caller can react instead of silently
+   * accepting a no-op.
+   */
+  async updateState(row: ClaimedSchedule, stateJson: string) {
     const STATE_MAX_BYTES = 100 * 1024;
     if (new TextEncoder().encode(stateJson).byteLength > STATE_MAX_BYTES) {
       throw new Error("stateJson exceeds 100KB limit");
     }
-    await this.db
+    const result = await this.db
       .update(schedules)
       .set({ stateJson })
-      .where(eq(schedules.id, id));
+      .where(
+        and(eq(schedules.id, row.id), eq(schedules.claimedAt, row.claimedAt))
+      );
+    return { lockLost: result.meta.changes === 0 };
   }
 }
 
