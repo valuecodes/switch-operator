@@ -109,9 +109,11 @@ Style: terse, one or two sentences max. Per-class template:
 
 Show all drafts in one block, grouped by comment id.
 
-**GATE 3.** Ask: `Post these replies? (yes / edit / cancel)`. Wait.
+**GATE 3.** Ask: `Post these replies (and resolve threads for fix-landed rows)? (yes / edit / cancel)`. Wait.
 
-## 6. Post replies (only after Gate 3 = yes)
+## 6. Post replies + resolve threads (only after Gate 3 = yes)
+
+### 6.1 Post replies
 
 - **Review / line comment** (came from `pulls/<PR>/comments`): reply in-thread:
   `gh api --method POST repos/<owner>/<repo>/pulls/<PR>/comments/<id>/replies -f body="<reply>"`
@@ -120,11 +122,27 @@ Show all drafts in one block, grouped by comment id.
 
 After each post, confirm it returned a 200/201. If any fail, list exactly which — don't claim success for a failed post.
 
+### 6.2 Resolve threads for fix-landed rows
+
+A row is "fix-landed" iff its reply starts with `Fixed in <sha>:` — i.e. the fix actually shipped in the commit. Mark each such review thread resolved. Do NOT resolve `noise`, `question`, `approved`, `ci-failure`, or deferred-fix `valid` threads.
+
+1. List the PR's review threads with their constituent comment ids:
+   ```
+   gh api graphql -F owner=<owner> -F name=<repo> -F num=<PR> -f query='query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){reviewThreads(first:100){nodes{id isResolved comments(first:10){nodes{databaseId}}}}}}}'
+   ```
+2. For each fix-landed reply, find the thread whose `comments.databaseId` list includes the original comment id. If `isResolved` is already `true`, skip. Otherwise resolve:
+   ```
+   gh api graphql -F threadId=<thread-node-id> -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}'
+   ```
+3. Confirm each response shows `thread.isResolved == true`. List any failures by original comment id.
+
+General PR comments (issues/comments) and review summaries don't have line-thread structure — nothing to resolve there.
+
 ## 7. Final summary
 
 Print:
 
-- `Triaged: <N>  Fixed: <N> (review + <N> ci)  Replied: <N>  Skipped (noise): <N>`
+- `Triaged: <N>  Fixed: <N> (review + <N> ci)  Replied: <N>  Resolved: <N>  Skipped (noise): <N>`
 - Commit SHA(s)
 - PR URL
 
@@ -138,3 +156,4 @@ Stop.
 - Never promise a fix that didn't actually land. Validation must pass AND I must confirm `pushed` before drafting replies.
 - Never address a comment that wasn't in the confirmed set (no scope creep).
 - Never reply to your own past comments.
+- Never resolve a thread for a deferred-fix `valid` row (reply was "Agreed, tracking" rather than "Fixed in <sha>"). Only resolve threads where the fix actually shipped in the commit.
