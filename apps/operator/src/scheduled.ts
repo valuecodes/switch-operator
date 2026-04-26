@@ -209,11 +209,20 @@ const handleScheduled = async (
   );
 
   // Handle failures — mark for retry
+  const completionTime = new Date();
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     const schedule = claimed[i];
     if (result.status === "fulfilled") {
-      await scheduleService.markSuccess(schedule.id);
+      const { lockLost } = await scheduleService.markSuccess(
+        schedule,
+        completionTime
+      );
+      if (lockLost) {
+        logger.warn("lock lost before recording success", {
+          scheduleId: schedule.id,
+        });
+      }
     }
 
     if (result.status === "rejected") {
@@ -225,10 +234,16 @@ const handleScheduled = async (
             : String(result.reason),
       });
 
-      const { exhausted } = await scheduleService.markFailed(
-        schedule.id,
-        schedule.retryCount
+      const { exhausted, lockLost } = await scheduleService.markFailed(
+        schedule,
+        completionTime
       );
+      if (lockLost) {
+        logger.warn("lock lost before recording failure", {
+          scheduleId: schedule.id,
+        });
+        continue;
+      }
       if (exhausted) {
         logger.warn("schedule retries exhausted, skipping until next run", {
           scheduleId: schedule.id,

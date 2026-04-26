@@ -1,4 +1,4 @@
-import { and, eq, lte, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import { z } from "zod";
@@ -10,6 +10,12 @@ type ScheduleType = (typeof SCHEDULE_TYPES)[number];
 
 const MAX_ACTIVE_SCHEDULES = 20;
 const MAX_RETRIES = 3;
+
+// A claim is treated as abandoned if it's older than this threshold,
+// allowing another worker to re-claim the row after a crashed/timed-out run.
+const STALE_LOCK_MS = 10 * 60 * 1000;
+
+type ClaimedSchedule = typeof schedules.$inferSelect & { claimedAt: string };
 
 const createScheduleSchema = z
   .object({
@@ -350,11 +356,20 @@ class ScheduleService {
   }
 
   /**
-   * Claim due schedules for a specific chat. Returns claimed rows
-   * with next_run_at already advanced to the next occurrence.
+   * Claim due schedules for a specific chat by acquiring a lock
+   * (claimed_at). next_run_at is NOT advanced here — that happens only
+   * after execution succeeds (or retries are exhausted), so an ambiguous
+   * D1 outcome can't silently drop an occurrence. Stale locks (older than
+   * STALE_LOCK_MS) are reclaimable to recover from crashed runs.
    */
-  async claimDueSchedules(now: Date, allowedChatId: string) {
+  async claimDueSchedules(
+    now: Date,
+    allowedChatId: string
+  ): Promise<ClaimedSchedule[]> {
     const nowIso = now.toISOString();
+    const staleBeforeIso = new Date(
+      now.getTime() - STALE_LOCK_MS
+    ).toISOString();
     const chatIdNum = Number(allowedChatId);
 
     const dueRows = await this.db
@@ -364,7 +379,11 @@ class ScheduleService {
         and(
           eq(schedules.active, true),
           lte(schedules.nextRunAt, nowIso),
-          eq(schedules.chatId, chatIdNum)
+          eq(schedules.chatId, chatIdNum),
+          or(
+            isNull(schedules.claimedAt),
+            lt(schedules.claimedAt, staleBeforeIso)
+          )
         )
       );
 
@@ -372,61 +391,77 @@ class ScheduleService {
       return [];
     }
 
-    // Claim each row by advancing next_run_at.
-    // The WHERE matches the row's actual stored nextRunAt so a concurrent
-    // cron invocation that already advanced it will get 0 changes.
-    const claimed: (typeof dueRows)[number][] = [];
+    const claimed: ClaimedSchedule[] = [];
     for (const row of dueRows) {
-      const nextRun = computeNextRun(row.scheduleType, row.timezone, now, {
-        hour: row.hour ?? undefined,
-        minute: row.minute ?? undefined,
-        dayOfWeek: row.dayOfWeek ?? undefined,
-        dayOfMonth: row.dayOfMonth ?? undefined,
-      });
+      const lockGuard =
+        row.claimedAt === null
+          ? isNull(schedules.claimedAt)
+          : eq(schedules.claimedAt, row.claimedAt);
       const result = await this.db
         .update(schedules)
-        .set({ nextRunAt: nextRun.toISOString() })
-        .where(
-          and(eq(schedules.id, row.id), eq(schedules.nextRunAt, row.nextRunAt))
-        );
+        .set({ claimedAt: nowIso })
+        .where(and(eq(schedules.id, row.id), lockGuard));
       if (result.meta.changes > 0) {
-        claimed.push(row);
+        claimed.push({ ...row, claimedAt: nowIso });
       }
     }
 
     return claimed;
   }
 
-  async markFailed(id: string, currentRetryCount: number) {
-    const newCount = currentRetryCount + 1;
-    if (newCount >= MAX_RETRIES) {
-      // All retries exhausted — reset retryCount so the next regular
-      // occurrence starts fresh.  nextRunAt was already advanced to the
-      // next occurrence by claimDueSchedules, so leave it as-is.
-      await this.db
-        .update(schedules)
-        .set({ retryCount: 0 })
-        .where(eq(schedules.id, id));
-      return { exhausted: true };
-    }
+  async markFailed(row: ClaimedSchedule, now: Date) {
+    const newCount = row.retryCount + 1;
+    const exhausted = newCount >= MAX_RETRIES;
 
-    const backoffMs = newCount * 2 * 60 * 1000;
-    const nextRetry = new Date(Date.now() + backoffMs);
-    await this.db
+    const update = exhausted
+      ? {
+          // Skip this slot, reset for the next regular occurrence.
+          nextRunAt: this.nextOccurrence(row, now).toISOString(),
+          retryCount: 0,
+          claimedAt: null,
+        }
+      : {
+          retryCount: newCount,
+          nextRunAt: new Date(
+            now.getTime() + newCount * 2 * 60 * 1000
+          ).toISOString(),
+          claimedAt: null,
+        };
+
+    const result = await this.db
       .update(schedules)
-      .set({
-        retryCount: newCount,
-        nextRunAt: nextRetry.toISOString(),
-      })
-      .where(eq(schedules.id, id));
-    return { exhausted: false };
+      .set(update)
+      .where(
+        and(eq(schedules.id, row.id), eq(schedules.claimedAt, row.claimedAt))
+      );
+
+    if (result.meta.changes === 0) {
+      return { exhausted: false, lockLost: true };
+    }
+    return { exhausted, lockLost: false };
   }
 
-  async markSuccess(id: string) {
-    await this.db
+  async markSuccess(row: ClaimedSchedule, now: Date) {
+    const result = await this.db
       .update(schedules)
-      .set({ retryCount: 0 })
-      .where(eq(schedules.id, id));
+      .set({
+        nextRunAt: this.nextOccurrence(row, now).toISOString(),
+        retryCount: 0,
+        claimedAt: null,
+      })
+      .where(
+        and(eq(schedules.id, row.id), eq(schedules.claimedAt, row.claimedAt))
+      );
+    return { lockLost: result.meta.changes === 0 };
+  }
+
+  private nextOccurrence(row: ClaimedSchedule, now: Date): Date {
+    return computeNextRun(row.scheduleType, row.timezone, now, {
+      hour: row.hour ?? undefined,
+      minute: row.minute ?? undefined,
+      dayOfWeek: row.dayOfWeek ?? undefined,
+      dayOfMonth: row.dayOfMonth ?? undefined,
+    });
   }
 
   async updateState(id: string, stateJson: string) {
