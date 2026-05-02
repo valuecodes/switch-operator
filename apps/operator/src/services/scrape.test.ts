@@ -148,7 +148,9 @@ describe("scrapeUrl", () => {
       vi.fn().mockResolvedValueOnce(createMockResponse(longHtml))
     );
 
-    const result = await scrapeUrl("https://example.com", 100);
+    const result = await scrapeUrl("https://example.com", {
+      maxTextLength: 100,
+    });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -270,6 +272,111 @@ describe("scrapeUrl", () => {
     if (!result.ok) {
       expect(result.error).toBe("Response exceeds 2MB size limit");
     }
+  });
+});
+
+describe("scrapeUrl via browserScraper", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const makeFetcher = (response: Response): Fetcher =>
+    ({ fetch: vi.fn().mockResolvedValue(response) }) as unknown as Fetcher;
+
+  it("returns markdown from a successful browser-scraper response", async () => {
+    const browserScraper = makeFetcher(
+      Response.json({
+        ok: true,
+        html: "<h1>Hello SPA</h1>",
+        finalUrl: "https://example.com/",
+        status: 200,
+        contentType: "text/html",
+        truncated: false,
+      })
+    );
+
+    const result = await scrapeUrl("https://example.com", {
+      browserScraper,
+      useBrowser: true,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.text).toContain("Hello SPA");
+    }
+  });
+
+  it("propagates error when browser-scraper returns ok:false without status", async () => {
+    const browserScraper = makeFetcher(
+      Response.json({ ok: false, error: "Navigation timeout" })
+    );
+
+    const result = await scrapeUrl("https://example.com", {
+      browserScraper,
+      useBrowser: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Navigation timeout");
+    }
+  });
+
+  it("maps browser-scraper status through ERROR_MAP", async () => {
+    const browserScraper = makeFetcher(
+      Response.json({ ok: false, error: "HTTP 403", status: 403 })
+    );
+
+    const result = await scrapeUrl("https://example.com", {
+      browserScraper,
+      useBrowser: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Blocked by site");
+      expect(result.statusCode).toBe(403);
+    }
+  });
+
+  it("returns error when browser-scraper returns invalid JSON", async () => {
+    const browserScraper = makeFetcher(
+      new Response("not-json", {
+        status: 500,
+        headers: { "content-type": "text/plain" },
+      })
+    );
+
+    const result = await scrapeUrl("https://example.com", {
+      browserScraper,
+      useBrowser: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/invalid JSON/);
+    }
+  });
+
+  it("uses native fetch when useBrowser is false even if browserScraper is provided", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(createMockResponse("<p>fetched</p>"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const browserScraperFetch = vi.fn();
+    const browserScraper = {
+      fetch: browserScraperFetch,
+    } as unknown as Fetcher;
+
+    const result = await scrapeUrl("https://example.com", {
+      browserScraper,
+      useBrowser: false,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(browserScraperFetch).not.toHaveBeenCalled();
   });
 });
 

@@ -18,6 +18,12 @@
       "migrations_dir": "migrations",
     },
   ],
+  "services": [
+    {
+      "binding": "BROWSER_SCRAPER",
+      "service": "switch-operator-browser-scraper",
+    },
+  ],
   "triggers": {
     "crons": ["* * * * *"],
   },

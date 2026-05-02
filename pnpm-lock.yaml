@@ -21,6 +21,52 @@ importers:
         specifier: 0.7.2
         version: 0.7.2(@ianvs/prettier-plugin-sort-imports@4.7.1(prettier@3.8.2))(prettier@3.8.2)
 
+  apps/browser-scraper:
+    dependencies:
+      '@cloudflare/playwright':
+        specifier: 1.2.0
+        version: 1.2.0
+      '@repo/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@repo/url-validator':
+        specifier: workspace:*
+        version: link:../../packages/url-validator
+      zod:
+        specifier: 4.3.6
+        version: 4.3.6
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 4.20260412.1
+        version: 4.20260412.1
+      '@repo/eslint':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@repo/prettier':
+        specifier: workspace:*
+        version: link:../../tooling/prettier
+      '@repo/typescript':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      eslint:
+        specifier: 9.39.1
+        version: 9.39.1(jiti@2.6.1)
+      prettier:
+        specifier: 3.8.2
+        version: 3.8.2
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: 4.1.4
+        version: 4.1.4(@types/node@25.6.0)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0))
+      wrangler:
+        specifier: 4.81.1
+        version: 4.81.1(@cloudflare/workers-types@4.20260412.1)
+
   apps/operator:
     dependencies:
       '@hono/zod-validator':
@@ -32,6 +78,9 @@ importers:
       '@repo/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@repo/url-validator':
+        specifier: workspace:*
+        version: link:../../packages/url-validator
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260412.1)
@@ -117,6 +166,30 @@ importers:
         version: 4.1.4(@types/node@25.6.0)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0))
 
   packages/logger:
+    devDependencies:
+      '@repo/eslint':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@repo/prettier':
+        specifier: workspace:*
+        version: link:../../tooling/prettier
+      '@repo/typescript':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      eslint:
+        specifier: 9.39.1
+        version: 9.39.1(jiti@2.6.1)
+      prettier:
+        specifier: 3.8.2
+        version: 3.8.2
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: 4.1.4
+        version: 4.1.4(@types/node@25.6.0)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0))
+
+  packages/url-validator:
     devDependencies:
       '@repo/eslint':
         specifier: workspace:*
@@ -278,6 +351,9 @@ packages:
   '@cloudflare/kv-asset-handler@0.4.2':
     resolution: {integrity: sha512-SIOD2DxrRRwQ+jgzlXCqoEFiKOFqaPjhnNTGKXSRLvp1HiOvapLaFG2kEr9dYQTYe8rKrd9uvDUzmAITeNyaHQ==}
     engines: {node: '>=18.0.0'}
+
+  '@cloudflare/playwright@1.2.0':
+    resolution: {integrity: sha512-+LQo135uWxf0M2nG4T05T0FNH9Qhif7Uq2AhT79hX/FuoTLORX+OmOshl+cObTderrRQ4wkq1AXrUBq3w2eubg==}
 
   '@cloudflare/unenv-preset@2.16.0':
     resolution: {integrity: sha512-8ovsRpwzPoEqPUzoErAYVv8l3FMZNeBVQfJTvtzP4AgLSRGZISRfuChFxHWUQd3n6cnrwkuTGxT+2cGo8EsyYg==}
@@ -2895,6 +2971,8 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@cloudflare/kv-asset-handler@0.4.2': {}
+
+  '@cloudflare/playwright@1.2.0': {}
 
   '@cloudflare/unenv-preset@2.16.0(unenv@2.0.0-rc.24)(workerd@1.20260409.1)':
     dependencies:

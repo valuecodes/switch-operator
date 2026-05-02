@@ -11,6 +11,7 @@ const envSchema = z.object({
 type AppEnv = {
   Bindings: z.infer<typeof envSchema> & {
     DB: D1Database;
+    BROWSER_SCRAPER: Fetcher;
   };
   Variables: {
     logger: Logger;

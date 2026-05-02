@@ -22,6 +22,9 @@ const schedules = sqliteTable(
     stateJson: text("state_json"),
     description: text("description").notNull(),
     active: int("active", { mode: "boolean" }).notNull().default(true),
+    useBrowser: int("use_browser", { mode: "boolean" })
+      .notNull()
+      .default(false),
     nextRunAt: text("next_run_at").notNull(),
     claimedAt: text("claimed_at"),
     retryCount: int("retry_count").notNull().default(0),

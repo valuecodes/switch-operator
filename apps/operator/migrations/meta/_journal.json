@@ -36,6 +36,13 @@
       "when": 1777190805045,
       "tag": "0004_minor_rictor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1777491867371,
+      "tag": "0005_nervous_scorpion",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `schedules` ADD `use_browser` integer DEFAULT false NOT NULL;
