@@ -46,4 +46,13 @@ const pendingActions = sqliteTable("pending_actions", {
   token: text("token"),
 });
 
-export { pendingActions, schedules };
+const pendingConversations = sqliteTable("pending_conversations", {
+  chatId: int("chat_id").primaryKey(),
+  messagesJson: text("messages_json").notNull(),
+  pendingToolCallId: text("pending_tool_call_id").notNull(),
+  optionsJson: text("options_json").notNull(),
+  token: text("token").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
+export { pendingActions, pendingConversations, schedules };

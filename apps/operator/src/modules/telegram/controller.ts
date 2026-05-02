@@ -1,9 +1,17 @@
+import type { Logger } from "@repo/logger";
 import type { Context } from "hono";
 
-import { OpenAiService } from "../../services/openai";
-import type { ToolExecutor, ToolResult } from "../../services/openai";
+import { buildInitialMessages, OpenAiService } from "../../services/openai";
+import type {
+  ToolExecutor,
+  ToolLoopMessages,
+  ToolLoopOutcome,
+  ToolResult,
+} from "../../services/openai";
 import { PendingActionService } from "../../services/pending-action";
 import type { PendingAction } from "../../services/pending-action";
+import { PendingConversationService } from "../../services/pending-conversation";
+import type { QuestionOption } from "../../services/pending-conversation";
 import {
   createScheduleSchema,
   MAX_ACTIVE_SCHEDULES,
@@ -26,6 +34,7 @@ import {
 import { validateSourceUrl } from "@repo/url-validator";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const QUESTION_BUTTON_LABEL_MAX = 32;
 
 const formatScheduleDescription = (
   type: string,
@@ -50,6 +59,9 @@ const formatScheduleDescription = (
   }
   const tz = typeof args.timezone === "string" ? args.timezone : "UTC";
   parts.push(`(${tz})`);
+  if (args.use_browser === true) {
+    parts.push("(browser rendering)");
+  }
   if (typeof args.description === "string") {
     parts.push(`— "${args.description}"`);
   }
@@ -69,6 +81,7 @@ const mapToolArgsToInput = (
   messagePrompt: args.message_prompt as string | undefined,
   sourceUrl: args.source_url as string | undefined,
   keywords: args.keywords as string[] | undefined,
+  useBrowser: args.use_browser as boolean | undefined,
   description: (args.description as string | undefined) ?? "",
 });
 
@@ -81,11 +94,26 @@ const buildConfirmationKeyboard = (token: string): InlineKeyboardMarkup => ({
   ],
 });
 
+const truncateLabel = (label: string, max: number): string =>
+  label.length <= max ? label : `${label.slice(0, max - 1)}…`;
+
+const buildQuestionKeyboard = (
+  token: string,
+  options: QuestionOption[]
+): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    options.map((opt, idx) => ({
+      text: truncateLabel(opt.label, QUESTION_BUTTON_LABEL_MAX),
+      callback_data: `q:${token}:${String(idx)}`,
+    })),
+  ],
+});
+
 const executePendingAction = async (
   action: PendingAction,
   chatId: number,
   db: D1Database,
-  logger: { info: (msg: string, meta?: Record<string, unknown>) => void }
+  logger: Logger
 ): Promise<string> => {
   const scheduleService = new ScheduleService(db);
 
@@ -104,6 +132,142 @@ const executePendingAction = async (
     return `Schedule ${id} has been deleted.`;
   }
   return `Schedule ${id} not found or already deleted.`;
+};
+
+type ToolExecutionContext = {
+  pendingButtonToken: string | undefined;
+};
+
+const buildScheduleToolExecutor = (
+  ctx: ToolExecutionContext,
+  chatId: number,
+  scheduleService: ScheduleService,
+  pendingService: PendingActionService,
+  logger: Logger
+): ToolExecutor => {
+  return async (name, args): Promise<ToolResult> => {
+    logger.debug("tool call received", { tool: name });
+
+    if (name === "list_schedules") {
+      const list = await scheduleService.list(chatId);
+      return {
+        result: JSON.stringify(
+          list.map((s) => ({
+            id: s.id,
+            type: s.scheduleType,
+            description: s.description,
+            hour: s.hour,
+            minute: s.minute,
+            dayOfWeek: s.dayOfWeek,
+            dayOfMonth: s.dayOfMonth,
+            timezone: s.timezone,
+            sourceUrl: s.sourceUrl,
+            nextRunAt: s.nextRunAt,
+          }))
+        ),
+      };
+    }
+
+    if (name === "create_schedule") {
+      const count = await scheduleService.countActive(chatId);
+      if (count >= MAX_ACTIVE_SCHEDULES) {
+        return {
+          error: `Quota exceeded: maximum ${String(MAX_ACTIVE_SCHEDULES)} active schedules`,
+        };
+      }
+
+      const input = mapToolArgsToInput(args);
+      const validation = createScheduleSchema.safeParse(input);
+      if (!validation.success) {
+        return { error: validation.error.message };
+      }
+
+      if (input.sourceUrl) {
+        const urlCheck = validateSourceUrl(input.sourceUrl);
+        if (!urlCheck.valid) {
+          return { error: urlCheck.reason };
+        }
+      }
+
+      ctx.pendingButtonToken = await pendingService.set(chatId, {
+        type: "create_schedule",
+        payload: input as unknown as Record<string, unknown>,
+        description: formatScheduleDescription("create", args),
+      });
+
+      return {
+        result: `Confirmation buttons attached. Reply with a short summary like 'Confirm creating: ${formatScheduleDescription("create", args)}' — do NOT ask the user to type YES.`,
+      };
+    }
+
+    if (name === "delete_schedule") {
+      const id = args.id as string | undefined;
+      if (!id) {
+        return { error: "Missing schedule ID" };
+      }
+
+      ctx.pendingButtonToken = await pendingService.set(chatId, {
+        type: "delete_schedule",
+        payload: { id },
+        description: `Delete schedule ${id}`,
+      });
+
+      return {
+        result: `Confirmation buttons attached. Reply with a short summary like 'Confirm deleting schedule ${id}' — do NOT ask the user to type YES.`,
+      };
+    }
+
+    return { error: `Unknown tool: ${name}` };
+  };
+};
+
+const dispatchOutcome = async (
+  outcome: ToolLoopOutcome,
+  chatId: number,
+  telegram: TelegramService,
+  conversationService: PendingConversationService,
+  pendingButtonToken: string | undefined
+): Promise<void> => {
+  if (outcome.kind === "ask_user_question") {
+    const questionToken = await conversationService.set(chatId, {
+      messages: outcome.messages,
+      pendingToolCallId: outcome.toolCallId,
+      options: outcome.options,
+    });
+
+    try {
+      const replyMarkup = buildQuestionKeyboard(questionToken, outcome.options);
+      const chunks = [
+        ...splitMessage(outcome.question, TELEGRAM_MAX_MESSAGE_LENGTH),
+      ];
+      for (let i = 0; i < chunks.length; i++) {
+        const isLast = i === chunks.length - 1;
+        await telegram.sendMessage({
+          chat_id: chatId,
+          text: chunks[i],
+          ...(isLast ? { reply_markup: replyMarkup } : {}),
+        });
+      }
+    } catch (error) {
+      await conversationService.clear(chatId);
+      throw error;
+    }
+    return;
+  }
+
+  const replyMarkup = pendingButtonToken
+    ? buildConfirmationKeyboard(pendingButtonToken)
+    : undefined;
+  const chunks = [...splitMessage(outcome.content, TELEGRAM_HTML_SAFE_LENGTH)];
+  for (let i = 0; i < chunks.length; i++) {
+    const isLast = i === chunks.length - 1;
+    await telegram.sendMessage({
+      chat_id: chatId,
+      text: markdownToTelegramHtml(chunks[i]),
+      parse_mode: "HTML" as const,
+      ...(isLast && replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+  }
 };
 
 type WebhookInput = {
@@ -154,6 +318,7 @@ const handleMessage = async (
   });
   const telegram = new TelegramService(c.env.TELEGRAM_BOT_TOKEN, logger);
   const pendingService = new PendingActionService(c.env.DB);
+  const conversationService = new PendingConversationService(c.env.DB);
 
   // Typed-YES fallback path. Atomically claim any non-expired pending row
   // so a concurrent button tap can't also execute it.
@@ -186,122 +351,48 @@ const handleMessage = async (
     }
   }
 
+  // Any new typed message starts a fresh conversation — discard a stale
+  // pending question so the user can change direction by typing.
+  await conversationService.clear(chatId);
+
   const scheduleService = new ScheduleService(c.env.DB);
+  const ctx: ToolExecutionContext = { pendingButtonToken: undefined };
+  const toolExecutor = buildScheduleToolExecutor(
+    ctx,
+    chatId,
+    scheduleService,
+    pendingService,
+    logger
+  );
 
-  let pendingButtonToken: string | undefined;
-
-  const toolExecutor: ToolExecutor = async (
-    name: string,
-    args: Record<string, unknown>
-  ): Promise<ToolResult> => {
-    logger.debug("tool call received", { tool: name });
-
-    if (name === "list_schedules") {
-      const list = await scheduleService.list(chatId);
-      return {
-        result: JSON.stringify(
-          list.map((s) => ({
-            id: s.id,
-            type: s.scheduleType,
-            description: s.description,
-            hour: s.hour,
-            minute: s.minute,
-            dayOfWeek: s.dayOfWeek,
-            dayOfMonth: s.dayOfMonth,
-            timezone: s.timezone,
-            sourceUrl: s.sourceUrl,
-            nextRunAt: s.nextRunAt,
-          }))
-        ),
-      };
-    }
-
-    if (name === "create_schedule") {
-      const count = await scheduleService.countActive(chatId);
-      if (count >= MAX_ACTIVE_SCHEDULES) {
-        return {
-          error: `Quota exceeded: maximum ${String(MAX_ACTIVE_SCHEDULES)} active schedules`,
-        };
-      }
-
-      const input = mapToolArgsToInput(args);
-      const validation = createScheduleSchema.safeParse(input);
-      if (!validation.success) {
-        return { error: validation.error.message };
-      }
-
-      if (input.sourceUrl) {
-        const urlCheck = validateSourceUrl(input.sourceUrl);
-        if (!urlCheck.valid) {
-          return { error: urlCheck.reason };
-        }
-      }
-
-      pendingButtonToken = await pendingService.set(chatId, {
-        type: "create_schedule",
-        payload: input as unknown as Record<string, unknown>,
-        description: formatScheduleDescription("create", args),
-      });
-
-      return {
-        result: `Confirmation buttons attached. Reply with a short summary like 'Confirm creating: ${formatScheduleDescription("create", args)}' — do NOT ask the user to type YES.`,
-      };
-    }
-
-    if (name === "delete_schedule") {
-      const id = args.id as string | undefined;
-      if (!id) {
-        return { error: "Missing schedule ID" };
-      }
-
-      pendingButtonToken = await pendingService.set(chatId, {
-        type: "delete_schedule",
-        payload: { id },
-        description: `Delete schedule ${id}`,
-      });
-
-      return {
-        result: `Confirmation buttons attached. Reply with a short summary like 'Confirm deleting schedule ${id}' — do NOT ask the user to type YES.`,
-      };
-    }
-
-    return { error: `Unknown tool: ${name}` };
-  };
-
-  let reply: string;
-  let replyIsHtml = true;
+  let outcome: ToolLoopOutcome | undefined;
   try {
     const openai = new OpenAiService(c.env.OPENAI_API_KEY, logger);
-    reply = await openai.replyWithTools(message.text, toolExecutor);
+    outcome = await openai.runToolLoop(
+      buildInitialMessages(message.text),
+      toolExecutor
+    );
   } catch (error) {
     logger.error("openai request failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    reply =
-      "Something went wrong while generating a response. Please try again.";
-    replyIsHtml = false;
-    pendingButtonToken = undefined;
     await pendingService.clear(chatId);
+    await conversationService.clear(chatId);
+    await telegram.sendMessage({
+      chat_id: chatId,
+      text: "Something went wrong while generating a response. Please try again.",
+    });
+    return c.json({ ok: true });
   }
 
-  const replyMarkup = pendingButtonToken
-    ? buildConfirmationKeyboard(pendingButtonToken)
-    : undefined;
-
   try {
-    const chunkMax = replyIsHtml
-      ? TELEGRAM_HTML_SAFE_LENGTH
-      : TELEGRAM_MAX_MESSAGE_LENGTH;
-    const chunks = [...splitMessage(reply, chunkMax)];
-    for (let i = 0; i < chunks.length; i++) {
-      const isLast = i === chunks.length - 1;
-      await telegram.sendMessage({
-        chat_id: chatId,
-        text: replyIsHtml ? markdownToTelegramHtml(chunks[i]) : chunks[i],
-        ...(replyIsHtml ? { parse_mode: "HTML" as const } : {}),
-        ...(isLast && replyMarkup ? { reply_markup: replyMarkup } : {}),
-      });
-    }
+    await dispatchOutcome(
+      outcome,
+      chatId,
+      telegram,
+      conversationService,
+      ctx.pendingButtonToken
+    );
   } catch (error) {
     await pendingService.clear(chatId);
     throw error;
@@ -310,11 +401,29 @@ const handleMessage = async (
   return c.json({ ok: true });
 };
 
+type ParsedCallback =
+  | { action: "confirm" | "cancel"; token: string }
+  | { action: "answer"; token: string; optionIndex: number };
+
 const parseCallbackData = (
   data: string | undefined
-): { action: "confirm" | "cancel"; token: string } | undefined => {
+): ParsedCallback | undefined => {
   if (!data) {
     return undefined;
+  }
+  if (data.startsWith("q:")) {
+    const rest = data.slice(2);
+    const colon = rest.indexOf(":");
+    if (colon === -1) {
+      return undefined;
+    }
+    const token = rest.slice(0, colon);
+    const indexStr = rest.slice(colon + 1);
+    if (!token || !/^\d+$/.test(indexStr)) {
+      return undefined;
+    }
+    const optionIndex = Number.parseInt(indexStr, 10);
+    return { action: "answer", token, optionIndex };
   }
   const colon = data.indexOf(":");
   if (colon === -1) {
@@ -332,6 +441,116 @@ const parseCallbackData = (
     return { action: "cancel", token };
   }
   return undefined;
+};
+
+const handleAnswerCallback = async (
+  c: Context<AppEnv, string, WebhookInput>,
+  cq: TelegramCallbackQuery,
+  parsed: { action: "answer"; token: string; optionIndex: number },
+  chatId: number,
+  messageId: number | undefined,
+  telegram: TelegramService,
+  logger: Logger
+): Promise<void> => {
+  const conversationService = new PendingConversationService(c.env.DB);
+  const pendingService = new PendingActionService(c.env.DB);
+
+  const consumed = await conversationService.consumeByToken(
+    chatId,
+    parsed.token
+  );
+
+  const ackAndClear = async (toast: string): Promise<void> => {
+    await telegram
+      .answerCallbackQuery({ callback_query_id: cq.id, text: toast })
+      .catch((err: unknown) => {
+        logger.warn("answerCallbackQuery failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    if (messageId !== undefined) {
+      await telegram
+        .editMessageReplyMarkup({ chat_id: chatId, message_id: messageId })
+        .catch((err: unknown) => {
+          logger.warn("editMessageReplyMarkup failed", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+    }
+  };
+
+  if (!consumed) {
+    await ackAndClear("Expired or already used");
+    return;
+  }
+
+  if (parsed.optionIndex < 0 || parsed.optionIndex >= consumed.options.length) {
+    logger.warn("answer callback option index out of range", {
+      callbackId: cq.id,
+      optionIndex: parsed.optionIndex,
+      optionsLength: consumed.options.length,
+    });
+    await ackAndClear("Invalid option");
+    return;
+  }
+
+  const chosen = consumed.options[parsed.optionIndex];
+  const messages: ToolLoopMessages = [
+    ...(consumed.messages as ToolLoopMessages),
+    {
+      role: "tool",
+      tool_call_id: consumed.pendingToolCallId,
+      content: JSON.stringify({ value: chosen.value, label: chosen.label }),
+    },
+  ];
+
+  // Ack the click immediately so the user's button stops spinning while we
+  // call OpenAI; clear the inline keyboard from the question message.
+  await ackAndClear("Recorded");
+
+  const scheduleService = new ScheduleService(c.env.DB);
+  const ctx: ToolExecutionContext = { pendingButtonToken: undefined };
+  const toolExecutor = buildScheduleToolExecutor(
+    ctx,
+    chatId,
+    scheduleService,
+    pendingService,
+    logger
+  );
+
+  let outcome: ToolLoopOutcome | undefined;
+  try {
+    const openai = new OpenAiService(c.env.OPENAI_API_KEY, logger);
+    outcome = await openai.runToolLoop(messages, toolExecutor);
+  } catch (error) {
+    logger.error("openai resume failed", {
+      callbackId: cq.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await pendingService.clear(chatId);
+    await conversationService.clear(chatId);
+    await telegram.sendMessage({
+      chat_id: chatId,
+      text: "Something went wrong while continuing the conversation. Please try again.",
+    });
+    return;
+  }
+
+  try {
+    await dispatchOutcome(
+      outcome,
+      chatId,
+      telegram,
+      conversationService,
+      ctx.pendingButtonToken
+    );
+  } catch (error) {
+    logger.error("dispatch resumed outcome failed", {
+      callbackId: cq.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await pendingService.clear(chatId);
+  }
 };
 
 const handleCallbackQuery = async (
@@ -373,8 +592,21 @@ const handleCallbackQuery = async (
   if (!parsed) {
     logger.warn("callback_query has malformed data", { callbackId: cq.id });
     await telegram
-      .answerCallbackQuery({ callback_query_id: cq.id })
+      .answerCallbackQuery({ callback_query_id: cq.id, text: "Malformed" })
       .catch(() => undefined);
+    return c.json({ ok: true });
+  }
+
+  if (parsed.action === "answer") {
+    await handleAnswerCallback(
+      c,
+      cq,
+      parsed,
+      chatId,
+      messageId,
+      telegram,
+      logger
+    );
     return c.json({ ok: true });
   }
 
