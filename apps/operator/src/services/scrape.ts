@@ -12,7 +12,7 @@ type ScrapeOptions = {
 };
 
 type FetchedContent =
-  | { ok: true; raw: string; contentType: string }
+  | { ok: true; raw: string; contentType: string; truncated?: boolean }
   | { ok: false; error: string; statusCode?: number };
 
 type BrowserScraperResponse =
@@ -236,7 +236,12 @@ const fetchViaBrowserScraper = async (
       : { ok: false, error: body.error };
   }
 
-  return { ok: true, raw: body.html, contentType: body.contentType };
+  return {
+    ok: true,
+    raw: body.html,
+    contentType: body.contentType,
+    truncated: body.truncated,
+  };
 };
 
 const scrapeUrl = async (
@@ -259,12 +264,16 @@ const scrapeUrl = async (
     return { ok: false, error: converted.error };
   }
 
-  const truncated = converted.text.length > maxTextLength;
-  const text = truncated
+  const textTruncated = converted.text.length > maxTextLength;
+  const text = textTruncated
     ? converted.text.slice(0, maxTextLength)
     : converted.text;
 
-  return { ok: true, text, truncated };
+  return {
+    ok: true,
+    text,
+    truncated: textTruncated || fetched.truncated === true,
+  };
 };
 
 export {

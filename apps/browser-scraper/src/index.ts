@@ -49,7 +49,7 @@ const handle = async (request: Request, env: Env): Promise<Response> => {
   } catch (error) {
     logger.error("unexpected render failure", {
       url: parsed.url,
-      message: error instanceof Error ? error.message : "Unknown error",
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
     return Response.json(
       { ok: false, error: "Internal render failure" },
