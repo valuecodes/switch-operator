@@ -306,6 +306,29 @@ describe("scrapeUrl via browserScraper", () => {
     }
   });
 
+  it("propagates truncated=true from browser-scraper even when text fits within maxTextLength", async () => {
+    const browserScraper = makeFetcher(
+      Response.json({
+        ok: true,
+        html: "<p>short content</p>",
+        finalUrl: "https://example.com/",
+        status: 200,
+        contentType: "text/html",
+        truncated: true,
+      })
+    );
+
+    const result = await scrapeUrl("https://example.com", {
+      browserScraper,
+      useBrowser: true,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.truncated).toBe(true);
+    }
+  });
+
   it("propagates error when browser-scraper returns ok:false without status", async () => {
     const browserScraper = makeFetcher(
       Response.json({ ok: false, error: "Navigation timeout" })
