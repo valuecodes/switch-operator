@@ -17,6 +17,7 @@
     "@hono/zod-validator": "0.7.6",
     "@repo/http-client": "workspace:*",
     "@repo/logger": "workspace:*",
+    "@repo/url-validator": "workspace:*",
     "drizzle-orm": "0.45.2",
     "hono": "4.12.12",
     "node-html-markdown": "2.0.0",

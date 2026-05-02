@@ -23,7 +23,7 @@ import {
   TELEGRAM_HTML_SAFE_LENGTH,
   TELEGRAM_MAX_MESSAGE_LENGTH,
 } from "../../utils/message";
-import { validateSourceUrl } from "../../utils/url-validator";
+import { validateSourceUrl } from "@repo/url-validator";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

@@ -16,7 +16,7 @@ import {
   TELEGRAM_HTML_SAFE_LENGTH,
   TELEGRAM_MAX_MESSAGE_LENGTH,
 } from "./utils/message";
-import { validateSourceUrl } from "./utils/url-validator";
+import { validateSourceUrl } from "@repo/url-validator";
 
 type Env = AppEnv["Bindings"];
 
@@ -84,7 +84,10 @@ const handleScheduled = async (
           return;
         }
 
-        const scrapeResult = await scrapeUrl(schedule.sourceUrl);
+        const scrapeResult = await scrapeUrl(schedule.sourceUrl, {
+          browserScraper: env.BROWSER_SCRAPER,
+          useBrowser: schedule.useBrowser,
+        });
         if (!scrapeResult.ok) {
           throw new Error(`Scrape failed: ${scrapeResult.error}`);
         }
