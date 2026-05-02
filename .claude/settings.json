@@ -6,7 +6,8 @@
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm test:*)",
       "Bash(pnpm format:*)",
-      "Bash(pnpm --filter:*)"
+      "Bash(pnpm --filter:*)",
+      "Bash(gh api *)"
     ]
   }
 }
