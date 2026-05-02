@@ -351,4 +351,52 @@ describe("createScheduleSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts useBrowser=true on a monitor", () => {
+    const result = createScheduleSchema.safeParse({
+      ...base,
+      sourceUrl: "https://example.com",
+      messagePrompt: "Summarize changes",
+      useBrowser: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.useBrowser).toBe(true);
+    }
+  });
+
+  it("accepts useBrowser=false explicitly", () => {
+    const result = createScheduleSchema.safeParse({
+      ...base,
+      sourceUrl: "https://example.com",
+      messagePrompt: "Summarize changes",
+      useBrowser: false,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.useBrowser).toBe(false);
+    }
+  });
+
+  it("leaves useBrowser undefined when omitted", () => {
+    const result = createScheduleSchema.safeParse({
+      ...base,
+      sourceUrl: "https://example.com",
+      messagePrompt: "Summarize changes",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.useBrowser).toBeUndefined();
+    }
+  });
+
+  it("rejects useBrowser of non-boolean type", () => {
+    const result = createScheduleSchema.safeParse({
+      ...base,
+      sourceUrl: "https://example.com",
+      messagePrompt: "Summarize changes",
+      useBrowser: "yes",
+    });
+    expect(result.success).toBe(false);
+  });
 });

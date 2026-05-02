@@ -23,6 +23,19 @@ vi.mock("../../services/pending-action", () => ({
     clear = pendingClearMock;
     set = pendingSetMock;
   },
+  generateToken: () => "tok-fake",
+}));
+
+const conversationConsumeByTokenMock = vi.fn();
+const conversationSetMock = vi.fn();
+const conversationClearMock = vi.fn();
+
+vi.mock("../../services/pending-conversation", () => ({
+  PendingConversationService: class {
+    consumeByToken = conversationConsumeByTokenMock;
+    set = conversationSetMock;
+    clear = conversationClearMock;
+  },
 }));
 
 import { onErrorHandler } from "../../middleware/error-handlers";
@@ -434,6 +447,12 @@ describe("POST /webhook/telegram — callback_query", () => {
     pendingClearMock.mockResolvedValue(undefined);
     pendingSetMock.mockReset();
     pendingSetMock.mockResolvedValue("tok-default");
+    conversationConsumeByTokenMock.mockReset();
+    conversationConsumeByTokenMock.mockResolvedValue(undefined);
+    conversationSetMock.mockReset();
+    conversationSetMock.mockResolvedValue("conv-tok");
+    conversationClearMock.mockReset();
+    conversationClearMock.mockResolvedValue(undefined);
     mockFetch.mockImplementation(() =>
       Promise.resolve(
         new Response(JSON.stringify({ ok: true }), {
@@ -610,5 +629,193 @@ describe("POST /webhook/telegram — callback_query", () => {
     await sendRequest(callbackUpdate({ data: "c:tok-1" }), headers);
 
     expect(removeMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe("question-answer callback (q:<token>:<index>)", () => {
+    it("acks 'Malformed' for non-numeric option index", async () => {
+      const res = await sendRequest(
+        callbackUpdate({ data: "q:tok-1:abc" }),
+        headers
+      );
+
+      expect(res.status).toBe(200);
+      expect(conversationConsumeByTokenMock).not.toHaveBeenCalled();
+      const ackCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+      );
+      expect(ackCall).toBeDefined();
+      if (!ackCall) {
+        return;
+      }
+      const ackBody = JSON.parse(
+        (ackCall[1] as { body: string }).body
+      ) as Record<string, unknown>;
+      expect(ackBody.text).toBe("Malformed");
+    });
+
+    it("acks 'Expired or already used' when conversation token is unknown", async () => {
+      conversationConsumeByTokenMock.mockResolvedValueOnce(undefined);
+
+      const res = await sendRequest(
+        callbackUpdate({ data: "q:tok-x:0" }),
+        headers
+      );
+
+      expect(res.status).toBe(200);
+      expect(conversationConsumeByTokenMock).toHaveBeenCalledWith(
+        12345,
+        "tok-x"
+      );
+      const ackCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+      );
+      expect(ackCall).toBeDefined();
+      if (!ackCall) {
+        return;
+      }
+      const ackBody = JSON.parse(
+        (ackCall[1] as { body: string }).body
+      ) as Record<string, unknown>;
+      expect(ackBody.text).toBe("Expired or already used");
+    });
+
+    it("acks 'Invalid option' when index is out of range", async () => {
+      conversationConsumeByTokenMock.mockResolvedValueOnce({
+        messages: [],
+        pendingToolCallId: "call_q",
+        options: [
+          { label: "Yes", value: true },
+          { label: "No", value: false },
+        ],
+      });
+
+      const res = await sendRequest(
+        callbackUpdate({ data: "q:tok-r:9" }),
+        headers
+      );
+
+      expect(res.status).toBe(200);
+      const ackCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+      );
+      expect(ackCall).toBeDefined();
+      if (!ackCall) {
+        return;
+      }
+      const ackBody = JSON.parse(
+        (ackCall[1] as { body: string }).body
+      ) as Record<string, unknown>;
+      expect(ackBody.text).toBe("Invalid option");
+    });
+
+    it("happy path: appends tool result with raw boolean value and resumes", async () => {
+      conversationConsumeByTokenMock.mockResolvedValueOnce({
+        messages: [
+          { role: "system", content: "sys" },
+          { role: "user", content: "monitor twitter.com" },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_q",
+                type: "function",
+                function: {
+                  name: "ask_user_question",
+                  arguments: JSON.stringify({
+                    question: "Use browser?",
+                    options: [
+                      { label: "Yes", value: true },
+                      { label: "No", value: false },
+                    ],
+                  }),
+                },
+              },
+            ],
+          },
+        ],
+        pendingToolCallId: "call_q",
+        options: [
+          { label: "Yes", value: true },
+          { label: "No", value: false },
+        ],
+      });
+
+      // OpenAI returns a final answer on resume.
+      openaiCreateMock.mockResolvedValueOnce({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { role: "assistant", content: "Got it." },
+          },
+        ],
+      });
+
+      const res = await sendRequest(
+        callbackUpdate({ data: "q:tok-r:0" }),
+        headers
+      );
+
+      expect(res.status).toBe(200);
+      expect(conversationConsumeByTokenMock).toHaveBeenCalledWith(
+        12345,
+        "tok-r"
+      );
+
+      // The OpenAI call should have received messages with a tool result that
+      // carries the raw boolean (NOT a string).
+      const openaiCall = openaiCreateMock.mock.calls.at(-1) as
+        | [{ messages: { role: string; content?: string }[] }]
+        | undefined;
+      expect(openaiCall).toBeDefined();
+      if (!openaiCall) {
+        return;
+      }
+      const sentMessages = openaiCall[0].messages;
+      const toolResult = sentMessages.find((m) => m.role === "tool");
+      expect(toolResult).toBeDefined();
+      expect(toolResult?.content).toBe(
+        JSON.stringify({ value: true, label: "Yes" })
+      );
+
+      // The bot then sends the LLM's final reply.
+      const sendCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].endsWith("/sendMessage")
+      );
+      expect(sendCall).toBeDefined();
+    });
+
+    it("ack toast says 'Recorded' on happy path", async () => {
+      conversationConsumeByTokenMock.mockResolvedValueOnce({
+        messages: [{ role: "system", content: "sys" }],
+        pendingToolCallId: "call_q",
+        options: [
+          { label: "Yes", value: true },
+          { label: "No", value: false },
+        ],
+      });
+      openaiCreateMock.mockResolvedValueOnce({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { role: "assistant", content: "ok" },
+          },
+        ],
+      });
+
+      await sendRequest(callbackUpdate({ data: "q:tok-r:1" }), headers);
+
+      const ackCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+      );
+      expect(ackCall).toBeDefined();
+      if (!ackCall) {
+        return;
+      }
+      const ackBody = JSON.parse(
+        (ackCall[1] as { body: string }).body
+      ) as Record<string, unknown>;
+      expect(ackBody.text).toBe("Recorded");
+    });
   });
 });

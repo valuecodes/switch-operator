@@ -39,6 +39,7 @@ const createScheduleSchema = z
     messagePrompt: z.string().max(500).optional(),
     sourceUrl: z.string().max(2048).optional(),
     keywords: z.array(z.string().trim().min(1).max(100)).max(10).optional(),
+    useBrowser: z.boolean().optional(),
     description: z.string().max(200),
   })
   .refine(
@@ -324,6 +325,7 @@ class ScheduleService {
         keywords: validated.keywords?.length
           ? JSON.stringify(validated.keywords)
           : undefined,
+        useBrowser: validated.useBrowser ?? false,
         description: validated.description,
         nextRunAt: nextRunAt.toISOString(),
       })

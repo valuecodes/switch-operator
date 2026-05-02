@@ -3,6 +3,8 @@ import OpenAI from "openai";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { z } from "zod";
 
+import type { QuestionOption } from "./pending-conversation";
+
 const SYSTEM_PROMPT = `You are a helpful personal assistant called Switch Operator. Be concise and helpful.
 
 You can create, list, and delete scheduled messages for the user.
@@ -23,6 +25,17 @@ The message_prompt should describe what to look for or how to analyze the page c
 
 For monitors with large pages, use the keywords parameter to pre-filter content before AI analysis.
 When keywords are set, the system only calls AI if at least one keyword appears on the page — saving time and cost.
+
+Use the use_browser parameter (boolean) on create_schedule to opt a monitor into JavaScript rendering via the browser scraper.
+When source_url is set and the page is likely a JS-rendered SPA (Twitter/X, Reddit, GitHub issues, sites whose content appears only after the page loads), call ask_user_question first with two options like:
+  question: "Should I use the browser scraper for this page (renders JavaScript)?"
+  options:
+    - { label: "Yes — needs JS rendering", value: true }
+    - { label: "No — static HTML", value: false }
+Then pass the chosen boolean (verbatim from the tool result) into create_schedule.use_browser.
+For obviously static pages (plain blogs, news pages, RSS/XML feeds, plain HTML), default use_browser to false without asking.
+
+Use ask_user_question sparingly — only when a choice materially changes the result and cannot be inferred. Do not ask about timezones, schedule types you can derive from the user's wording, or trivia. Prefer 0–1 questions per request. Emit ask_user_question as the only tool call in its turn whenever possible.
 
 Monitor examples:
 - "Notify me when Beck is on TV" → source_url with the TV listings page, message_prompt: "Check if Beck appears in today's listings. Notify with channel and time if found.", keywords: ["Beck"]
@@ -87,6 +100,11 @@ const SCHEDULE_TOOLS: ChatCompletionTool[] = [
             description:
               "Optional keywords to pre-filter scraped page content before AI analysis. When set, only runs AI if at least one keyword appears on the page. Use for efficiency on large pages. Only valid for monitors (requires source_url).",
           },
+          use_browser: {
+            type: "boolean",
+            description:
+              "When true, the monitor fetches via the browser scraper which executes JavaScript. Only useful for SPA / JS-rendered pages. Defaults to false. Only meaningful for monitors (requires source_url).",
+          },
           description: {
             type: "string",
             description: "Short description of this schedule (max 200 chars).",
@@ -118,7 +136,61 @@ const SCHEDULE_TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "ask_user_question",
+      description:
+        "Ask the user a clarifying question with 2–4 button-labeled options. Use ONLY when a choice materially changes the result and cannot be inferred. The selected option's value flows back as the tool result; pass it directly into the appropriate downstream tool parameter (boolean for yes/no, string for choices).",
+      parameters: {
+        type: "object",
+        properties: {
+          question: {
+            type: "string",
+            description: "The question to display to the user (max 500 chars).",
+          },
+          options: {
+            type: "array",
+            minItems: 2,
+            maxItems: 4,
+            items: {
+              type: "object",
+              properties: {
+                label: {
+                  type: "string",
+                  description: "Short button label (max 100 chars).",
+                },
+                value: {
+                  description:
+                    "Opaque value passed back as the tool result when this option is chosen. Type matches the downstream parameter (boolean for yes/no, string for choices, number for counts).",
+                  anyOf: [
+                    { type: "boolean" },
+                    { type: "string" },
+                    { type: "number" },
+                  ],
+                },
+              },
+              required: ["label", "value"],
+            },
+          },
+        },
+        required: ["question", "options"],
+      },
+    },
+  },
 ];
+
+const questionOptionSchema = z.object({
+  label: z.string().min(1).max(100),
+  value: z.union([z.boolean(), z.string(), z.number()]),
+});
+
+const askUserQuestionSchema = z.object({
+  question: z.string().min(1).max(500),
+  options: z.array(questionOptionSchema).min(2).max(4),
+});
+
+const MAX_QUESTIONS_PER_CONVERSATION = 3;
 
 type ToolResult = { result: string } | { error: string };
 type ToolExecutor = (
@@ -126,7 +198,55 @@ type ToolExecutor = (
   args: Record<string, unknown>
 ) => Promise<ToolResult>;
 
+type ToolLoopMessages = OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+
+type ToolLoopOutcome =
+  | { kind: "final"; content: string; messages: ToolLoopMessages }
+  | {
+      kind: "ask_user_question";
+      question: string;
+      options: QuestionOption[];
+      toolCallId: string;
+      messages: ToolLoopMessages;
+    };
+
 const MAX_TOOL_ITERATIONS = 5;
+
+const buildInitialMessages = (userMessage: string): ToolLoopMessages => [
+  { role: "system", content: SYSTEM_PROMPT },
+  { role: "user", content: userMessage },
+];
+
+const countAskUserQuestionCalls = (messages: ToolLoopMessages): number => {
+  let count = 0;
+  for (const m of messages) {
+    if (m.role !== "assistant") {
+      continue;
+    }
+    const toolCalls = m.tool_calls;
+    if (!toolCalls) {
+      continue;
+    }
+    for (const tc of toolCalls) {
+      if (tc.type === "function" && tc.function.name === "ask_user_question") {
+        count++;
+      }
+    }
+  }
+  return count;
+};
+
+const pushToolError = (
+  messages: ToolLoopMessages,
+  toolCallId: string,
+  error: string
+): void => {
+  messages.push({
+    role: "tool",
+    tool_call_id: toolCallId,
+    content: JSON.stringify({ error }),
+  });
+};
 
 class OpenAiService {
   private readonly client: OpenAI;
@@ -163,18 +283,13 @@ class OpenAiService {
     return content;
   }
 
-  async replyWithTools(
-    userMessage: string,
+  async runToolLoop(
+    messages: ToolLoopMessages,
     toolExecutor: ToolExecutor
-  ): Promise<string> {
-    this.logger.debug("sending chat completion with tools", {
-      messageLength: userMessage.length,
+  ): Promise<ToolLoopOutcome> {
+    this.logger.debug("running tool loop", {
+      initialMessageCount: messages.length,
     });
-
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userMessage },
-    ];
 
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
       const response = await this.client.chat.completions.create({
@@ -196,11 +311,67 @@ class OpenAiService {
         if (!content) {
           throw new Error("OpenAI returned empty response");
         }
-        return content;
+        return { kind: "final", content, messages };
       }
+
+      let pausedQuestion:
+        | { question: string; options: QuestionOption[]; toolCallId: string }
+        | undefined;
 
       for (const toolCall of message.tool_calls) {
         if (toolCall.type !== "function") {
+          continue;
+        }
+
+        if (toolCall.function.name === "ask_user_question") {
+          if (pausedQuestion) {
+            // Only one ask_user_question per turn is honored; extras get
+            // a tool error so the assistant turn is still well-formed.
+            pushToolError(
+              messages,
+              toolCall.id,
+              "Only one ask_user_question per assistant turn is supported."
+            );
+            continue;
+          }
+
+          let parsedArgs: unknown;
+          try {
+            parsedArgs = JSON.parse(toolCall.function.arguments);
+          } catch {
+            this.logger.error("failed to parse ask_user_question arguments", {
+              arguments: toolCall.function.arguments,
+            });
+            pushToolError(messages, toolCall.id, "Invalid tool arguments");
+            continue;
+          }
+
+          const validation = askUserQuestionSchema.safeParse(parsedArgs);
+          if (!validation.success) {
+            pushToolError(
+              messages,
+              toolCall.id,
+              `Invalid ask_user_question args: ${validation.error.message}`
+            );
+            continue;
+          }
+
+          if (
+            countAskUserQuestionCalls(messages) > MAX_QUESTIONS_PER_CONVERSATION
+          ) {
+            pushToolError(
+              messages,
+              toolCall.id,
+              "Question quota exceeded — proceed without further questions."
+            );
+            continue;
+          }
+
+          pausedQuestion = {
+            question: validation.data.question,
+            options: validation.data.options,
+            toolCallId: toolCall.id,
+          };
           continue;
         }
 
@@ -220,24 +391,47 @@ class OpenAiService {
             tool: toolCall.function.name,
             arguments: toolCall.function.arguments,
           });
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: JSON.stringify({ error: "Invalid tool arguments" }),
-          });
+          pushToolError(messages, toolCall.id, "Invalid tool arguments");
           continue;
         }
         const result = await toolExecutor(toolCall.function.name, args);
-
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
           content: JSON.stringify(result),
         });
       }
+
+      if (pausedQuestion) {
+        return {
+          kind: "ask_user_question",
+          question: pausedQuestion.question,
+          options: pausedQuestion.options,
+          toolCallId: pausedQuestion.toolCallId,
+          messages,
+        };
+      }
     }
 
     throw new Error("Tool calling exceeded maximum iterations");
+  }
+
+  async replyWithTools(
+    userMessage: string,
+    toolExecutor: ToolExecutor
+  ): Promise<string> {
+    this.logger.debug("sending chat completion with tools", {
+      messageLength: userMessage.length,
+    });
+
+    const messages = buildInitialMessages(userMessage);
+    const outcome = await this.runToolLoop(messages, toolExecutor);
+    if (outcome.kind !== "final") {
+      throw new Error(
+        "ask_user_question is not supported in replyWithTools — use runToolLoop directly to handle pause/resume."
+      );
+    }
+    return outcome.content;
   }
 
   async analyzeMonitor(params: {
@@ -307,5 +501,19 @@ const monitorAnalysisSchema = z.object({
 
 type MonitorAnalysis = z.infer<typeof monitorAnalysisSchema>;
 
-export { MAX_TOOL_ITERATIONS, OpenAiService, SCHEDULE_TOOLS };
-export type { MonitorAnalysis, ToolExecutor, ToolResult };
+export {
+  buildInitialMessages,
+  countAskUserQuestionCalls,
+  MAX_QUESTIONS_PER_CONVERSATION,
+  MAX_TOOL_ITERATIONS,
+  OpenAiService,
+  SCHEDULE_TOOLS,
+  SYSTEM_PROMPT,
+};
+export type {
+  MonitorAnalysis,
+  ToolExecutor,
+  ToolLoopMessages,
+  ToolLoopOutcome,
+  ToolResult,
+};
