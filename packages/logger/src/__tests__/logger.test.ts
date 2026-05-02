@@ -61,6 +61,32 @@ describe("Logger", () => {
       expect(entry.statusCode).toBe(200);
     });
 
+    it("redacts sensitive top-level metadata keys (case-insensitive)", () => {
+      const logger = new Logger({ context: "api" });
+      logger.info("call", {
+        authorization: "Bearer secret-token",
+        Authorization: "Bearer also-secret",
+        api_key: "sk-abc123",
+        APIKey: "sk-def456",
+        token: "tok-xyz",
+        secret: "shh",
+        password: "hunter2",
+        cookie: "session=abc",
+        method: "GET",
+      });
+
+      const entry = parseLogEntry(consoleSpy.log) as Record<string, unknown>;
+      expect(entry.authorization).toBe("[redacted]");
+      expect(entry.Authorization).toBe("[redacted]");
+      expect(entry.api_key).toBe("[redacted]");
+      expect(entry.APIKey).toBe("[redacted]");
+      expect(entry.token).toBe("[redacted]");
+      expect(entry.secret).toBe("[redacted]");
+      expect(entry.password).toBe("[redacted]");
+      expect(entry.cookie).toBe("[redacted]");
+      expect(entry.method).toBe("GET");
+    });
+
     it("does not allow metadata to override reserved fields", () => {
       const logger = new Logger({ context: "api" });
       logger.warn("actual", {

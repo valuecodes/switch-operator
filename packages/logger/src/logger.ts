@@ -16,6 +16,26 @@ const CONSOLE_METHOD: Record<LogLevel, "debug" | "log" | "warn" | "error"> = {
   error: "error",
 };
 
+const REDACTED_KEYS = new Set([
+  "authorization",
+  "api_key",
+  "apikey",
+  "token",
+  "secret",
+  "password",
+  "cookie",
+]);
+
+const REDACTED = "[redacted]";
+
+const redactMetadata = (metadata: LogMetadata): LogMetadata => {
+  const out: LogMetadata = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    out[key] = REDACTED_KEYS.has(key.toLowerCase()) ? REDACTED : value;
+  }
+  return out;
+};
+
 export class Logger {
   private readonly context: string;
   private readonly minLevel: LogLevel;
@@ -55,7 +75,7 @@ export class Logger {
     }
 
     const entry: LogEntry = {
-      ...(metadata ?? {}),
+      ...(metadata ? redactMetadata(metadata) : {}),
       timestamp: new Date().toISOString(),
       level,
       context: this.context,
