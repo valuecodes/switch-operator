@@ -106,7 +106,8 @@ class ConversationRunner {
         const list = await scheduleService.list(this.chatId);
         return {
           result: JSON.stringify(
-            list.map((s) => ({
+            list.map((s, idx) => ({
+              position: idx + 1,
               id: s.id,
               type: s.scheduleType,
               description: s.description,
