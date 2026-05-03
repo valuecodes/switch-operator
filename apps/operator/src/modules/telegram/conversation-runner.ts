@@ -170,15 +170,25 @@ class ConversationRunner {
         if (!id) {
           return { error: "Missing schedule ID" };
         }
+        const summary =
+          typeof args.summary === "string" && args.summary.trim().length > 0
+            ? args.summary.trim()
+            : undefined;
+        if (!summary) {
+          return {
+            error:
+              "Missing summary. Pass a human-readable summary built from the matching list_schedules entry (type, time, description) so the user can recognize what's being deleted.",
+          };
+        }
 
         this.pendingButtonToken = await this.pendingActions.set(this.chatId, {
           type: "delete_schedule",
           payload: { id },
-          description: `Delete schedule ${id}`,
+          description: `Delete: ${summary}`,
         });
 
         return {
-          result: `Confirmation buttons attached. Reply with a short summary like 'Confirm deleting schedule ${id}' — do NOT ask the user to type YES.`,
+          result: `Confirmation buttons attached. Reply with a short summary like 'Confirm deleting: ${summary}' — do NOT ask the user to type YES.`,
         };
       }
 
