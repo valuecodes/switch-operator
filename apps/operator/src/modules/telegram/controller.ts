@@ -279,28 +279,58 @@ const handleAnswerCallback = async (
   logger: Logger
 ): Promise<void> => {
   const conversationService = new PendingConversationService(c.env.DB);
-  const consumed = await conversationService.consumeByToken(
-    chatId,
-    parsed.token
-  );
 
-  if (!consumed) {
-    await ackAndClearKeyboard(
-      cq,
-      chatId,
-      messageId,
-      telegram,
-      logger,
-      "Expired or already used"
-    );
-    return;
-  }
+  let consumed: Awaited<ReturnType<typeof conversationService.consumeByToken>>;
+  try {
+    // Peek first so an out-of-range/tampered index doesn't destroy the
+    // pending state — only consume after the index is validated.
+    const peek = await conversationService.getByToken(chatId, parsed.token);
+    if (!peek) {
+      await ackAndClearKeyboard(
+        cq,
+        chatId,
+        messageId,
+        telegram,
+        logger,
+        "Expired or already used"
+      );
+      return;
+    }
 
-  if (parsed.optionIndex < 0 || parsed.optionIndex >= consumed.options.length) {
-    logger.warn("answer callback option index out of range", {
+    if (parsed.optionIndex < 0 || parsed.optionIndex >= peek.options.length) {
+      logger.warn("answer callback option index out of range", {
+        callbackId: cq.id,
+        optionIndex: parsed.optionIndex,
+        optionsLength: peek.options.length,
+      });
+      await ackAndClearKeyboard(
+        cq,
+        chatId,
+        messageId,
+        telegram,
+        logger,
+        "Invalid option"
+      );
+      return;
+    }
+
+    // Atomic delete-by-token guards against double-tap; only one click wins.
+    consumed = await conversationService.consumeByToken(chatId, parsed.token);
+    if (!consumed) {
+      await ackAndClearKeyboard(
+        cq,
+        chatId,
+        messageId,
+        telegram,
+        logger,
+        "Expired or already used"
+      );
+      return;
+    }
+  } catch (error) {
+    logger.error("answer callback consume failed", {
       callbackId: cq.id,
-      optionIndex: parsed.optionIndex,
-      optionsLength: consumed.options.length,
+      error: error instanceof Error ? error.message : String(error),
     });
     await ackAndClearKeyboard(
       cq,
@@ -308,7 +338,7 @@ const handleAnswerCallback = async (
       messageId,
       telegram,
       logger,
-      "Invalid option"
+      "Something went wrong"
     );
     return;
   }

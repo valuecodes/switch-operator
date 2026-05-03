@@ -335,10 +335,14 @@ class ScheduleService {
   }
 
   async list(chatId: number) {
+    // Sort by createdAt then id so the position numbers we hand to the
+    // model are stable across calls — the user refers to schedules by their
+    // displayed position when asking to delete.
     return this.db
       .select()
       .from(schedules)
-      .where(and(eq(schedules.chatId, chatId), eq(schedules.active, true)));
+      .where(and(eq(schedules.chatId, chatId), eq(schedules.active, true)))
+      .orderBy(schedules.createdAt, schedules.id);
   }
 
   async countActive(chatId: number): Promise<number> {

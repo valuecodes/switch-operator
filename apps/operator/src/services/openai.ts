@@ -196,6 +196,13 @@ const askUserQuestionSchema = z.object({
 
 const MAX_QUESTIONS_PER_CONVERSATION = 3;
 
+// Tools that mutate persistent state. When the model emits one of these in
+// the same assistant turn as ask_user_question, we refuse rather than
+// execute it — otherwise we'd silently write a pending action that the
+// user only sees after answering the question, leaving stale state if they
+// don't.
+const MUTATING_TOOLS = new Set(["create_schedule", "delete_schedule"]);
+
 type ToolResult = { result: string } | { error: string };
 type ToolExecutor = (
   name: string,
@@ -322,6 +329,14 @@ class OpenAiService {
         | { question: string; options: QuestionOption[]; toolCallId: string }
         | undefined;
 
+      // Pre-scan: if this batch contains an ask_user_question, mutating
+      // sibling tool calls must be rejected (not executed) so we don't
+      // commit hidden writes while the user only sees a question UI.
+      const hasAskInBatch = message.tool_calls.some(
+        (tc) =>
+          tc.type === "function" && tc.function.name === "ask_user_question"
+      );
+
       for (const toolCall of message.tool_calls) {
         if (toolCall.type !== "function") {
           continue;
@@ -376,6 +391,15 @@ class OpenAiService {
             options: validation.data.options,
             toolCallId: toolCall.id,
           };
+          continue;
+        }
+
+        if (hasAskInBatch && MUTATING_TOOLS.has(toolCall.function.name)) {
+          pushToolError(
+            messages,
+            toolCall.id,
+            `${toolCall.function.name} cannot run in the same turn as ask_user_question. Wait for the user's answer, then call it on the next turn.`
+          );
           continue;
         }
 
