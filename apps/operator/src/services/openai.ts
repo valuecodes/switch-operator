@@ -40,7 +40,7 @@ Monitor examples:
 - "Notify me when Beck is on TV" → source_url with the TV listings page, message_prompt: "Check if Beck appears in today's listings. Notify with channel and time if found.", keywords: ["Beck"]
 - "Weekly report changes" → source_url with the report page, message_prompt: "Compare this week's content to last week. Summarize key changes."
 
-When listing schedules, format them as a numbered list (1, 2, 3...) with key details like description, type, time, and next run.
+When listing schedules, render each entry on its own line prefixed with its position number followed by a period and a space (e.g. "1. ", "2. "). Use the position field from the tool result verbatim — do not renumber. Include description, type, time, and next run on each line.
 When the user asks to delete a schedule by number, first call list_schedules to get the current list, then call delete_schedule with the ID from the matching position AND a short human-readable summary (type, time, description) so the user can recognize the row in the confirmation prompt.`;
 
 const SCHEDULE_TOOLS: ChatCompletionTool[] = [
