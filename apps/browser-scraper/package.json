@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --port 8788 --inspector-port 9230",
     "deploy": "wrangler deploy",
     "typecheck": "tsc",
     "lint": "eslint .",
