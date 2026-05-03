@@ -26,12 +26,14 @@ vi.mock("../../services/pending-action", () => ({
   generateToken: () => "tok-fake",
 }));
 
+const conversationGetByTokenMock = vi.fn();
 const conversationConsumeByTokenMock = vi.fn();
 const conversationSetMock = vi.fn();
 const conversationClearMock = vi.fn();
 
 vi.mock("../../services/pending-conversation", () => ({
   PendingConversationService: class {
+    getByToken = conversationGetByTokenMock;
     consumeByToken = conversationConsumeByTokenMock;
     set = conversationSetMock;
     clear = conversationClearMock;
@@ -561,6 +563,8 @@ describe("POST /webhook/telegram — callback_query", () => {
     pendingClearMock.mockResolvedValue(undefined);
     pendingSetMock.mockReset();
     pendingSetMock.mockResolvedValue("tok-default");
+    conversationGetByTokenMock.mockReset();
+    conversationGetByTokenMock.mockResolvedValue(undefined);
     conversationConsumeByTokenMock.mockReset();
     conversationConsumeByTokenMock.mockResolvedValue(undefined);
     conversationSetMock.mockReset();
@@ -768,7 +772,7 @@ describe("POST /webhook/telegram — callback_query", () => {
     });
 
     it("acks 'Expired or already used' when conversation token is unknown", async () => {
-      conversationConsumeByTokenMock.mockResolvedValueOnce(undefined);
+      conversationGetByTokenMock.mockResolvedValueOnce(undefined);
 
       const res = await sendRequest(
         callbackUpdate({ data: "q:tok-x:0" }),
@@ -776,10 +780,9 @@ describe("POST /webhook/telegram — callback_query", () => {
       );
 
       expect(res.status).toBe(200);
-      expect(conversationConsumeByTokenMock).toHaveBeenCalledWith(
-        12345,
-        "tok-x"
-      );
+      expect(conversationGetByTokenMock).toHaveBeenCalledWith(12345, "tok-x");
+      // Out-of-range/unknown tokens must not consume the row.
+      expect(conversationConsumeByTokenMock).not.toHaveBeenCalled();
       const ackCall = mockFetch.mock.calls.find(
         (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
       );
@@ -793,8 +796,8 @@ describe("POST /webhook/telegram — callback_query", () => {
       expect(ackBody.text).toBe("Expired or already used");
     });
 
-    it("acks 'Invalid option' when index is out of range", async () => {
-      conversationConsumeByTokenMock.mockResolvedValueOnce({
+    it("acks 'Invalid option' when index is out of range and preserves pending state", async () => {
+      conversationGetByTokenMock.mockResolvedValueOnce({
         messages: [],
         pendingToolCallId: "call_q",
         options: [
@@ -809,6 +812,9 @@ describe("POST /webhook/telegram — callback_query", () => {
       );
 
       expect(res.status).toBe(200);
+      // The pending row must remain intact so a tampered/malformed callback
+      // can't strand the user with no way to retry from the real buttons.
+      expect(conversationConsumeByTokenMock).not.toHaveBeenCalled();
       const ackCall = mockFetch.mock.calls.find(
         (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
       );
@@ -822,8 +828,30 @@ describe("POST /webhook/telegram — callback_query", () => {
       expect(ackBody.text).toBe("Invalid option");
     });
 
+    it("acks 'Something went wrong' when peek throws", async () => {
+      conversationGetByTokenMock.mockRejectedValueOnce(new Error("db down"));
+
+      const res = await sendRequest(
+        callbackUpdate({ data: "q:tok-r:0" }),
+        headers
+      );
+
+      expect(res.status).toBe(200);
+      const ackCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && c[0].endsWith("/answerCallbackQuery")
+      );
+      expect(ackCall).toBeDefined();
+      if (!ackCall) {
+        return;
+      }
+      const ackBody = JSON.parse(
+        (ackCall[1] as { body: string }).body
+      ) as Record<string, unknown>;
+      expect(ackBody.text).toBe("Something went wrong");
+    });
+
     it("happy path: appends tool result with raw boolean value and resumes", async () => {
-      conversationConsumeByTokenMock.mockResolvedValueOnce({
+      const stored = {
         messages: [
           { role: "system", content: "sys" },
           { role: "user", content: "monitor twitter.com" },
@@ -853,7 +881,9 @@ describe("POST /webhook/telegram — callback_query", () => {
           { label: "Yes", value: true },
           { label: "No", value: false },
         ],
-      });
+      };
+      conversationGetByTokenMock.mockResolvedValueOnce(stored);
+      conversationConsumeByTokenMock.mockResolvedValueOnce(stored);
 
       // OpenAI returns a final answer on resume.
       openaiCreateMock.mockResolvedValueOnce({
@@ -900,14 +930,16 @@ describe("POST /webhook/telegram — callback_query", () => {
     });
 
     it("ack toast says 'Recorded' on happy path", async () => {
-      conversationConsumeByTokenMock.mockResolvedValueOnce({
+      const stored = {
         messages: [{ role: "system", content: "sys" }],
         pendingToolCallId: "call_q",
         options: [
           { label: "Yes", value: true },
           { label: "No", value: false },
         ],
-      });
+      };
+      conversationGetByTokenMock.mockResolvedValueOnce(stored);
+      conversationConsumeByTokenMock.mockResolvedValueOnce(stored);
       openaiCreateMock.mockResolvedValueOnce({
         choices: [
           {

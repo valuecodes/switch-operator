@@ -20,6 +20,26 @@ type PendingConversation = {
 
 const TTL_MS = 5 * 60 * 1000;
 
+type PendingConversationRow = {
+  messagesJson: string;
+  pendingToolCallId: string;
+  optionsJson: string;
+};
+
+const parseRow = (
+  row: PendingConversationRow
+): PendingConversation | undefined => {
+  try {
+    return {
+      messages: JSON.parse(row.messagesJson) as unknown[],
+      pendingToolCallId: row.pendingToolCallId,
+      options: JSON.parse(row.optionsJson) as QuestionOption[],
+    };
+  } catch {
+    return undefined;
+  }
+};
+
 class PendingConversationService {
   private readonly db: DrizzleD1Database;
 
@@ -58,6 +78,27 @@ class PendingConversationService {
     return token;
   }
 
+  async getByToken(
+    chatId: number,
+    token: string
+  ): Promise<PendingConversation | undefined> {
+    const nowIso = new Date().toISOString();
+    const rows = await this.db
+      .select()
+      .from(pendingConversations)
+      .where(
+        and(
+          eq(pendingConversations.chatId, chatId),
+          eq(pendingConversations.token, token),
+          gt(pendingConversations.expiresAt, nowIso)
+        )
+      );
+    if (rows.length === 0) {
+      return undefined;
+    }
+    return parseRow(rows[0]);
+  }
+
   async consumeByToken(
     chatId: number,
     token: string
@@ -76,12 +117,7 @@ class PendingConversationService {
     if (deleted.length === 0) {
       return undefined;
     }
-    const row = deleted[0];
-    return {
-      messages: JSON.parse(row.messagesJson) as unknown[],
-      pendingToolCallId: row.pendingToolCallId,
-      options: JSON.parse(row.optionsJson) as QuestionOption[],
-    };
+    return parseRow(deleted[0]);
   }
 
   async clear(chatId: number): Promise<void> {

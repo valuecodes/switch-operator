@@ -387,6 +387,54 @@ describe("OpenAiService", () => {
       expect(siblingResult).toBeDefined();
     });
 
+    it("rejects mutating sibling tool calls when ask_user_question is in the same batch", async () => {
+      createMock.mockResolvedValueOnce({
+        choices: [
+          {
+            finish_reason: "tool_calls",
+            message: {
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                {
+                  id: "call_create",
+                  type: "function",
+                  function: {
+                    name: "create_schedule",
+                    arguments: "{}",
+                  },
+                },
+                {
+                  id: "call_q",
+                  type: "function",
+                  function: {
+                    name: "ask_user_question",
+                    arguments: validQuestionArgs,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const executor: ToolExecutor = vi.fn();
+      const messages = buildInitialMessages("monitor twitter.com");
+      const outcome = await service.runToolLoop(messages, executor);
+
+      // Mutating sibling must NOT execute; the model gets a tool error so
+      // it can retry on the next turn (after the user answers).
+      expect(executor).not.toHaveBeenCalled();
+      expect(outcome.kind).toBe("ask_user_question");
+      const rejection = outcome.messages.find(
+        (m) =>
+          m.role === "tool" &&
+          (m as { tool_call_id?: string }).tool_call_id === "call_create"
+      ) as { content?: string } | undefined;
+      expect(rejection?.content).toContain("create_schedule");
+      expect(rejection?.content).toContain("ask_user_question");
+    });
+
     it("denies the 4th ask_user_question and continues to final", async () => {
       const priorAskTurn = (id: string): unknown => ({
         role: "assistant",
