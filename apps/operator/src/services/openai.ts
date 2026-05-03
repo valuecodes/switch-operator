@@ -27,15 +27,14 @@ For monitors with large pages, use the keywords parameter to pre-filter content 
 When keywords are set, the system only calls AI if at least one keyword appears on the page — saving time and cost.
 
 Use the use_browser parameter (boolean) on create_schedule to opt a monitor into JavaScript rendering via the browser scraper.
-When source_url is set and the page is likely a JS-rendered SPA (Twitter/X, Reddit, GitHub issues, sites whose content appears only after the page loads), call ask_user_question first with two options like:
+Whenever source_url is set on a create_schedule call, you MUST first call ask_user_question to confirm whether the monitor needs the browser scraper. Do not infer use_browser from the URL. Do not omit it. Do not call create_schedule and ask_user_question in the same turn — emit ask_user_question alone, then call create_schedule after the user's answer arrives, passing the chosen boolean verbatim into create_schedule.use_browser.
+Use this exact form for the question:
   question: "Should I use the browser scraper for this page (renders JavaScript)?"
   options:
     - { label: "Yes — needs JS rendering", value: true }
     - { label: "No — static HTML", value: false }
-Then pass the chosen boolean (verbatim from the tool result) into create_schedule.use_browser.
-For obviously static pages (plain blogs, news pages, RSS/XML feeds, plain HTML), default use_browser to false without asking.
 
-Use ask_user_question sparingly — only when a choice materially changes the result and cannot be inferred. Do not ask about timezones, schedule types you can derive from the user's wording, or trivia. Prefer 0–1 questions per request. Emit ask_user_question as the only tool call in its turn whenever possible.
+Do not ask about timezones, schedule types, or anything you can derive from the user's wording.
 
 Monitor examples:
 - "Notify me when Beck is on TV" → source_url with the TV listings page, message_prompt: "Check if Beck appears in today's listings. Notify with channel and time if found.", keywords: ["Beck"]
@@ -103,7 +102,7 @@ const SCHEDULE_TOOLS: ChatCompletionTool[] = [
           use_browser: {
             type: "boolean",
             description:
-              "When true, the monitor fetches via the browser scraper which executes JavaScript. Only useful for SPA / JS-rendered pages. Defaults to false. Only meaningful for monitors (requires source_url).",
+              "When true, the monitor fetches via the browser scraper which executes JavaScript. Only useful for SPA / JS-rendered pages. Required whenever source_url is set — confirm the value with the user via ask_user_question before calling create_schedule.",
           },
           description: {
             type: "string",
@@ -141,7 +140,7 @@ const SCHEDULE_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "ask_user_question",
       description:
-        "Ask the user a clarifying question with 2–4 button-labeled options. Use ONLY when a choice materially changes the result and cannot be inferred. The selected option's value flows back as the tool result; pass it directly into the appropriate downstream tool parameter (boolean for yes/no, string for choices).",
+        "Ask the user a clarifying question with 2–4 button-labeled options. REQUIRED before every create_schedule call that has source_url set, to confirm use_browser. Otherwise use whenever a tool parameter affects observable behavior and you are not certain. The selected option's value flows back as the tool result; pass it directly into the appropriate downstream tool parameter (boolean for yes/no, string for choices).",
       parameters: {
         type: "object",
         properties: {

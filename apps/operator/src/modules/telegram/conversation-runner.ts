@@ -123,6 +123,17 @@ class ConversationRunner {
       }
 
       if (name === "create_schedule") {
+        if (
+          typeof args.source_url === "string" &&
+          args.source_url.length > 0 &&
+          args.use_browser === undefined
+        ) {
+          return {
+            error:
+              "Monitors require an explicit use_browser choice. Call ask_user_question first to ask the user whether this URL needs the browser scraper (JS rendering), then retry create_schedule with the chosen boolean.",
+          };
+        }
+
         const count = await scheduleService.countActive(this.chatId);
         if (count >= MAX_ACTIVE_SCHEDULES) {
           return {
