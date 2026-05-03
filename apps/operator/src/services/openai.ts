@@ -41,7 +41,7 @@ Monitor examples:
 - "Weekly report changes" → source_url with the report page, message_prompt: "Compare this week's content to last week. Summarize key changes."
 
 When listing schedules, format them as a numbered list (1, 2, 3...) with key details like description, type, time, and next run.
-When the user asks to delete a schedule by number, first call list_schedules to get the current list, then use the ID from the matching position to call delete_schedule.`;
+When the user asks to delete a schedule by number, first call list_schedules to get the current list, then call delete_schedule with the ID from the matching position AND a short human-readable summary (type, time, description) so the user can recognize the row in the confirmation prompt.`;
 
 const SCHEDULE_TOOLS: ChatCompletionTool[] = [
   {
@@ -130,8 +130,13 @@ const SCHEDULE_TOOLS: ChatCompletionTool[] = [
         type: "object",
         properties: {
           id: { type: "string", description: "The schedule ID to delete." },
+          summary: {
+            type: "string",
+            description:
+              "Human-readable summary of the schedule being deleted (e.g. 'daily monitor at 9:00 — Twitter Elon'). Shown in the user's confirmation prompt so they can recognize what's about to be deleted. Build this from the matching list_schedules entry: include schedule type, time, and description.",
+          },
         },
-        required: ["id"],
+        required: ["id", "summary"],
       },
     },
   },
