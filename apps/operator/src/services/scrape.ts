@@ -73,8 +73,8 @@ const readBodyWithLimit = async (
       if (done) {
         break;
       }
-      const remaining = MAX_BODY_BYTES - totalBytes;
-      if (value.byteLength >= remaining) {
+      if (totalBytes + value.byteLength > MAX_BODY_BYTES) {
+        const remaining = MAX_BODY_BYTES - totalBytes;
         chunks.push(value.subarray(0, remaining));
         totalBytes += remaining;
         truncated = true;
