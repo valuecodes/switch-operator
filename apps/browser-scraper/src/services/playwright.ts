@@ -6,6 +6,27 @@ import { validateSourceUrl } from "@repo/url-validator";
 const NAV_TIMEOUT_MS = 15_000;
 const MAX_HTML_CHARS = 2 * 1024 * 1024;
 
+type BrowserErrorKind = "browser_unavailable" | "browser_internal";
+
+const BROWSER_UNAVAILABLE_PATTERNS = [
+  "connectOverCDP",
+  "Timeout 30000ms exceeded",
+  "WebSocket",
+  "ErrorEvent",
+  "Target closed",
+  "Connection closed",
+] as const;
+
+const classifyBrowserError = (error: unknown): BrowserErrorKind => {
+  const message = error instanceof Error ? error.message : String(error);
+  for (const pattern of BROWSER_UNAVAILABLE_PATTERNS) {
+    if (message.includes(pattern)) {
+      return "browser_unavailable";
+    }
+  }
+  return "browser_internal";
+};
+
 type RenderSuccess = {
   ok: true;
   html: string;
@@ -98,5 +119,10 @@ class PlaywrightService {
   }
 }
 
-export { MAX_HTML_CHARS, NAV_TIMEOUT_MS, PlaywrightService };
-export type { RenderError, RenderResult, RenderSuccess };
+export {
+  classifyBrowserError,
+  MAX_HTML_CHARS,
+  NAV_TIMEOUT_MS,
+  PlaywrightService,
+};
+export type { BrowserErrorKind, RenderError, RenderResult, RenderSuccess };

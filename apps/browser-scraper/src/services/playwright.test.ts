@@ -6,7 +6,8 @@ vi.mock("@cloudflare/playwright", () => ({
 }));
 
 const { launch } = await import("@cloudflare/playwright");
-const { PlaywrightService } = await import("./playwright");
+const { classifyBrowserError, PlaywrightService } =
+  await import("./playwright");
 
 type GotoFn = () => Promise<{
   status: () => number;
@@ -113,5 +114,32 @@ describe("PlaywrightService.render", () => {
     );
 
     expect(result).toEqual({ ok: false, error: "HTTP 404", status: 404 });
+  });
+});
+
+describe("classifyBrowserError", () => {
+  it.each([
+    ["browserType.connectOverCDP: Timeout 30000ms exceeded."],
+    ["Timeout 30000ms exceeded"],
+    ["WebSocket error: SessionID: abc [object ErrorEvent]"],
+    ["Target closed"],
+    ["Connection closed while reading from the driver"],
+  ])("classifies %s as browser_unavailable", (message) => {
+    expect(classifyBrowserError(new Error(message))).toBe(
+      "browser_unavailable"
+    );
+  });
+
+  it("classifies unknown errors as browser_internal", () => {
+    expect(classifyBrowserError(new Error("Something else broke"))).toBe(
+      "browser_internal"
+    );
+  });
+
+  it("handles non-Error throwables", () => {
+    expect(classifyBrowserError("plain string")).toBe("browser_internal");
+    expect(classifyBrowserError({ toString: () => "WebSocket boom" })).toBe(
+      "browser_unavailable"
+    );
   });
 });

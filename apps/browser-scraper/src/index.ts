@@ -3,7 +3,7 @@ import { Logger } from "@repo/logger";
 import { validateSourceUrl } from "@repo/url-validator";
 import { z } from "zod";
 
-import { PlaywrightService } from "./services/playwright";
+import { classifyBrowserError, PlaywrightService } from "./services/playwright";
 
 type Env = { BROWSER: BrowserWorker };
 
@@ -47,9 +47,18 @@ const handle = async (request: Request, env: Env): Promise<Response> => {
     );
     return Response.json(result);
   } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    if (classifyBrowserError(error) === "browser_unavailable") {
+      logger.warn("browser unavailable", { url: parsed.url, errorMessage });
+      return Response.json(
+        { ok: false, error: "Browser unavailable" },
+        { status: 503 }
+      );
+    }
     logger.error("unexpected render failure", {
       url: parsed.url,
-      errorMessage: error instanceof Error ? error.message : "Unknown error",
+      errorMessage,
     });
     return Response.json(
       { ok: false, error: "Internal render failure" },
