@@ -259,8 +259,8 @@ describe("scrapeUrl", () => {
     }
   });
 
-  it("returns error when response body exceeds 2MB", async () => {
-    const largeBody = "x".repeat(3 * 1024 * 1024);
+  it("truncates response bodies exceeding 2MB and marks truncated", async () => {
+    const largeBody = `<p>${"x".repeat(3 * 1024 * 1024)}</p>`;
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValueOnce(createMockResponse(largeBody))
@@ -268,9 +268,9 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Response exceeds 2MB size limit");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.truncated).toBe(true);
     }
   });
 });

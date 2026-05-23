@@ -7,7 +7,7 @@
       "Bash(pnpm test:*)",
       "Bash(pnpm format:*)",
       "Bash(pnpm --filter:*)",
-      "Bash(gh api *)"
+      "Bash(gh api:*)"
     ]
   }
 }

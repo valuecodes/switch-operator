@@ -61,10 +61,11 @@ const concatChunks = (chunks: Uint8Array[], totalBytes: number): Uint8Array => {
 
 const readBodyWithLimit = async (
   body: ReadableStream<Uint8Array>
-): Promise<{ bytes: Uint8Array } | { error: string }> => {
+): Promise<{ bytes: Uint8Array; truncated: boolean }> => {
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
+  let truncated = false;
 
   try {
     for (;;) {
@@ -72,18 +73,22 @@ const readBodyWithLimit = async (
       if (done) {
         break;
       }
-      totalBytes += value.byteLength;
-      if (totalBytes > MAX_BODY_BYTES) {
+      const remaining = MAX_BODY_BYTES - totalBytes;
+      if (value.byteLength >= remaining) {
+        chunks.push(value.subarray(0, remaining));
+        totalBytes += remaining;
+        truncated = true;
         await reader.cancel();
-        return { error: "Response exceeds 2MB size limit" };
+        break;
       }
       chunks.push(value);
+      totalBytes += value.byteLength;
     }
   } finally {
     reader.releaseLock();
   }
 
-  return { bytes: concatChunks(chunks, totalBytes) };
+  return { bytes: concatChunks(chunks, totalBytes), truncated };
 };
 
 const collapseWhitespace = (text: string): string =>
@@ -189,14 +194,11 @@ const fetchViaNative = async (url: string): Promise<FetchedContent> => {
   const bodyResult = await readBodyWithLimit(
     response.body as ReadableStream<Uint8Array>
   );
-  if ("error" in bodyResult) {
-    return { ok: false, error: bodyResult.error };
-  }
 
   const raw = new TextDecoder().decode(bodyResult.bytes);
   const contentType = response.headers.get("content-type") ?? "";
 
-  return { ok: true, raw, contentType };
+  return { ok: true, raw, contentType, truncated: bodyResult.truncated };
 };
 
 const fetchViaBrowserScraper = async (
