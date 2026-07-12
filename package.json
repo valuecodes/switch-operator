@@ -22,13 +22,16 @@
     "@ianvs/prettier-plugin-sort-imports": "4.7.1",
     "@repo/prettier": "workspace:*",
     "prettier": "3.8.2",
-    "prettier-plugin-tailwindcss": "0.7.2"
+    "prettier-plugin-tailwindcss": "0.7.2",
+    "vite": "8.0.16"
   },
   "pnpm": {
     "overrides": {
-      "esbuild": "0.27.3",
-      "postcss": "8.5.10",
-      "brace-expansion": "5.0.6"
+      "esbuild": ">=0.28.1",
+      "undici": ">=7.28.0",
+      "ws": ">=8.21.0",
+      "js-yaml": ">=4.2.0",
+      "@babel/core": ">=7.29.6"
     }
   }
 }

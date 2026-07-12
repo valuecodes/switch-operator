@@ -45,9 +45,13 @@ class HttpClient {
     path: string,
     options: RequestOptions<T> & { body?: Record<string, unknown> }
   ): Promise<z.infer<T>> {
-    const url = `${this.baseUrl}${path}`;
+    const queryString = options.query
+      ? new URLSearchParams(options.query).toString()
+      : "";
+    const url = `${this.baseUrl}${path}${queryString ? `?${queryString}` : ""}`;
     const headers = { ...this.defaultHeaders, ...options.headers };
 
+    // Log `path` only — never `url`/`query`, which may carry secrets.
     this.logger.debug("outgoing request", { method, path });
 
     const init: RequestInit = { method, headers };

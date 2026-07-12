@@ -102,6 +102,40 @@ describe("HttpClient", () => {
     });
   });
 
+  describe("query params", () => {
+    it("appends query params to the URL", async () => {
+      mockFetch.mockResolvedValueOnce(createJsonResponse({ ok: true }));
+
+      await client.get("/query", {
+        schema,
+        query: { function: "TIME_SERIES_DAILY", symbol: "SPY", apikey: "sk_1" },
+      });
+
+      const url = mockFetch.mock.calls[0]?.[0] as string;
+      expect(url).toBe(
+        "https://api.example.com/query?function=TIME_SERIES_DAILY&symbol=SPY&apikey=sk_1"
+      );
+    });
+
+    it("does not include query params in the logged path", async () => {
+      mockFetch.mockResolvedValueOnce(createJsonResponse({ ok: true }));
+
+      await client.get("/query", {
+        schema,
+        query: { symbol: "SPY", apikey: "secret-key-123" },
+      });
+
+      expect(logger.debug).toHaveBeenCalledWith("outgoing request", {
+        method: "GET",
+        path: "/query",
+      });
+      const logged = JSON.stringify(
+        (logger.debug as ReturnType<typeof vi.fn>).mock.calls
+      );
+      expect(logged).not.toContain("secret-key-123");
+    });
+  });
+
   describe("headers", () => {
     it("merges default and per-request headers with per-request winning", async () => {
       mockFetch.mockResolvedValueOnce(createJsonResponse({ ok: true }));
