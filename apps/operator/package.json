@@ -20,7 +20,7 @@
     "@repo/telegram": "workspace:*",
     "@repo/url-validator": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "hono": "4.12.18",
+    "hono": "4.12.27",
     "node-html-markdown": "2.0.0",
     "openai": "6.34.0",
     "zod": "4.3.6"

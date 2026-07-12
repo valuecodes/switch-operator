@@ -10,6 +10,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@repo/alpha-vantage": "workspace:*",
     "@repo/logger": "workspace:*",
     "@repo/telegram": "workspace:*",
     "zod": "4.3.6"

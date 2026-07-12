@@ -45,7 +45,12 @@ Local secrets live in `apps/alerts/.dev.vars` (gitignored):
 ```
 TELEGRAM_BOT_TOKEN=...
 ALLOWED_CHAT_ID=...
+ALPHA_VANTAGE_API_KEY=...
 ```
+
+All keys are required — the worker validates them on every run and fails all
+alerts if any is missing. A free Alpha Vantage key is available at
+<https://www.alphavantage.co/support/#api-key>.
 
 ## Secrets & deploy
 
@@ -55,6 +60,7 @@ environment:
 ```sh
 pnpm --filter @repo/alerts exec wrangler secret put TELEGRAM_BOT_TOKEN
 pnpm --filter @repo/alerts exec wrangler secret put ALLOWED_CHAT_ID
+pnpm --filter @repo/alerts exec wrangler secret put ALPHA_VANTAGE_API_KEY
 ```
 
 Deploys run automatically on push to `main` (see `.github/workflows/main.yml`).
