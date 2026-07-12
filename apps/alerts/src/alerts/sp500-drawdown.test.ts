@@ -56,7 +56,7 @@ describe("sp500Drawdown", () => {
   });
 
   it("returns null when both closes are in the same drawdown band", async () => {
-    // ATH 100; today −8%, prev −7% → both above the 10% threshold.
+    // ATH 100; today −8%, prev −7% → both sit in the 5% band, no crossing.
     series = seriesFromCloses([92, 93, 100]);
 
     expect(await run()).toBeNull();
@@ -68,36 +68,49 @@ describe("sp500Drawdown", () => {
     expect(await run()).toBeNull();
   });
 
-  it("reports a downward crossing of a single threshold", async () => {
-    // ATH 100; prev −8% (band 0) → today −12% (band 10%).
+  it("reports a downward crossing of a single level with deploy guidance", async () => {
+    // ATH 100; prev −8% (band 5%) → today −12% (band 10%).
     series = seriesFromCloses([88, 92, 100]);
 
     const message = await run();
 
-    expect(message).toContain("fell below");
-    expect(message).toContain("10%");
+    expect(message).toContain("CORRECTION");
+    expect(message).toContain("Deploy");
+    expect(message).toContain("15%");
     expect(message).toContain("2026-07-11");
   });
 
-  it("reports a recovery back above a threshold", async () => {
-    // ATH 100; prev −12% (band 10%) → today −8% (band 0).
+  it("reports a recovery back above a level with refill guidance", async () => {
+    // ATH 100; prev −12% (band 10%) → today −8% (band 5%).
     series = seriesFromCloses([92, 88, 100]);
 
     const message = await run();
 
-    expect(message).toContain("recovered above");
-    expect(message).toContain("10%");
+    expect(message).toContain("REBOUND");
+    expect(message).toContain("Rebuild");
+    expect(message).toContain("15%");
   });
 
-  it("lists every threshold crossed in a single-day move", async () => {
-    // ATH 100; prev −8% (band 0) → today −22% (band 20%): crosses 10% and 20%.
+  it("sums the deploy amounts for every level crossed in a single-day move", async () => {
+    // ATH 100; prev −8% (band 5%) → today −22% (band 20%): crosses 10% and 20%.
     series = seriesFromCloses([78, 92, 100]);
 
     const message = await run();
 
-    expect(message).toContain("fell below");
-    expect(message).toContain("10%");
-    expect(message).toContain("20%");
+    expect(message).toContain("BEAR MARKET");
+    expect(message).toContain("Deploy");
+    expect(message).toContain("45%"); // 15% + 30%
+  });
+
+  it("pings the 5% dip with no deploy guidance", async () => {
+    // ATH 100; prev −3% (band 0) → today −6% (band 5%, deploy 0).
+    series = seriesFromCloses([94, 97, 100]);
+
+    const message = await run();
+
+    expect(message).toContain("DIP");
+    expect(message).toContain("keep your powder dry");
+    expect(message).not.toContain("Deploy");
   });
 
   it("returns null when today prints a new all-time high", async () => {

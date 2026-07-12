@@ -3,21 +3,39 @@ import type { DailyBar } from "@repo/alpha-vantage/types";
 
 import type { Alert } from "./types";
 
-/**
- * Drawdown thresholds (fractions of the all-time high) to watch. Adjust this
- * list to change which levels trigger an alert — e.g. add `0.05` or drop `0.5`.
- */
-const DRAWDOWN_THRESHOLDS = [0.1, 0.2, 0.3, 0.4, 0.5];
+type DrawdownLevel = {
+  /** Drawdown from the all-time high (fraction) that triggers this level. */
+  threshold: number;
+  /** Fraction of the *original* cash reserve to deploy when crossing down. */
+  deploy: number;
+  /** Punchy headline, escalating with severity. */
+  headline: string;
+};
 
 /**
- * The deepest threshold the drawdown has breached (`dd >= T`), or `0` when the
- * price is above every threshold. Two closes in the same band mean no crossing.
+ * Drawdown levels to watch, with the staged cash-reserve deployment plan. Adjust
+ * this list to change thresholds, deploy amounts, or copy. `deploy` values are
+ * fractions of the original reserve and sum to 1.0 by the −50% level; the −5%
+ * level is an informational "dip" ping with no deployment.
+ */
+const DRAWDOWN_LEVELS: DrawdownLevel[] = [
+  { threshold: 0.05, deploy: 0, headline: "💧 DIP" },
+  { threshold: 0.1, deploy: 0.15, headline: "📉 CORRECTION" },
+  { threshold: 0.2, deploy: 0.3, headline: "🐻 BEAR MARKET" },
+  { threshold: 0.3, deploy: 0.3, headline: "🔥 CRASH" },
+  { threshold: 0.4, deploy: 0.2, headline: "💥 MELTDOWN" },
+  { threshold: 0.5, deploy: 0.05, headline: "☢️ CAPITULATION" },
+];
+
+/**
+ * The deepest level the drawdown has breached (`dd >= threshold`), or `0` when
+ * the price is above every level. Two closes in the same band mean no crossing.
  */
 const bandFor = (drawdown: number): number => {
   let band = 0;
-  for (const threshold of DRAWDOWN_THRESHOLDS) {
-    if (drawdown >= threshold) {
-      band = threshold;
+  for (const level of DRAWDOWN_LEVELS) {
+    if (drawdown >= level.threshold) {
+      band = level.threshold;
     }
   }
   return band;
@@ -31,11 +49,12 @@ const formatPercent = (fraction: number): string =>
   `${Math.round(fraction * 100)}%`;
 
 /**
- * Alerts when the S&P 500 (via SPY) crosses a drawdown threshold relative to its
- * all-time-high daily close — in either direction. Detection is stateless: it
- * compares the two most recent daily closes, so a crossing is reported exactly
- * once, on the day the drawdown band changes. The alert runs at 08:00 UTC
- * (before the US open), so both bars are always completed closes.
+ * Alerts when the S&P 500 (via SPY) crosses a drawdown level relative to its
+ * all-time-high daily close — in either direction — and tells you how much of
+ * your cash reserve to deploy (falling) or rebuild (recovering). Detection is
+ * stateless: it compares the two most recent daily closes, so a crossing is
+ * reported exactly once, on the day the drawdown band changes. The alert runs at
+ * 08:00 UTC (before the US open), so both bars are always completed closes.
  *
  * Trade-off: if the worker misses a scheduled run, a crossing that happened on
  * the skipped trading day is not reported. Accepted to avoid adding persistence.
@@ -74,28 +93,43 @@ const sp500Drawdown: Alert = {
       return null;
     }
 
+    const stats = `SPY $${today.close.toFixed(2)} on ${today.date} · ATH $${athToday.toFixed(2)} (−${formatPercent(ddToday)})`;
+
     if (bandToday > bandPrev) {
-      // Market fell through one or more thresholds since the prior close.
-      const crossed = DRAWDOWN_THRESHOLDS.filter(
-        (t) => t > bandPrev && t <= bandToday
+      // Market fell through one or more levels since the prior close.
+      const crossed = DRAWDOWN_LEVELS.filter(
+        (l) => l.threshold > bandPrev && l.threshold <= bandToday
       );
-      const levels = crossed.map(formatPercent).join(", ");
+      const deepest = crossed[crossed.length - 1];
+      const deploySum = crossed.reduce((sum, l) => sum + l.deploy, 0);
+      const action =
+        deploySum > 0
+          ? `🫡 Deploy <b>${formatPercent(deploySum)}</b> of your original cash reserve`
+          : `🧊 Just a dip — keep your powder dry`;
       return [
-        `📉 S&P 500 fell below <b>${levels}</b> from its all-time high`,
-        `${today.date}: SPY $${today.close.toFixed(2)} (−${formatPercent(ddToday)} from ATH $${athToday.toFixed(2)})`,
+        `${deepest.headline} — <b>S&P 500 down ${formatPercent(bandToday)} from its all-time high!</b>`,
+        stats,
+        action,
       ].join("\n");
     }
 
-    // Market recovered back above one or more thresholds.
-    const crossed = DRAWDOWN_THRESHOLDS.filter(
-      (t) => t > bandToday && t <= bandPrev
+    // Market recovered back above one or more levels.
+    const crossed = DRAWDOWN_LEVELS.filter(
+      (l) => l.threshold > bandToday && l.threshold <= bandPrev
     );
-    const levels = crossed.map(formatPercent).join(", ");
+    // Deepest level reclaimed (crossed is ascending by threshold).
+    const reclaimed = crossed[crossed.length - 1].threshold;
+    const refillSum = crossed.reduce((sum, l) => sum + l.deploy, 0);
+    const action =
+      refillSum > 0
+        ? `💰 Rebuild your cash reserve: add back <b>${formatPercent(refillSum)}</b>`
+        : `🌤️ Storm passing — nothing to rebuild yet`;
     return [
-      `📈 S&P 500 recovered above <b>${levels}</b> from its all-time high`,
-      `${today.date}: SPY $${today.close.toFixed(2)} (−${formatPercent(ddToday)} from ATH $${athToday.toFixed(2)})`,
+      `📈 <b>REBOUND — S&P 500 back above ${formatPercent(reclaimed)} from its all-time high</b>`,
+      stats,
+      action,
     ].join("\n");
   },
 };
 
-export { sp500Drawdown, DRAWDOWN_THRESHOLDS };
+export { sp500Drawdown, DRAWDOWN_LEVELS };
