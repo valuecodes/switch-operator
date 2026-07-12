@@ -1,4 +1,4 @@
-import type { LogEntry } from "@repo/logger";
+import type { LogEntry } from "@repo/logger/types";
 import { Hono } from "hono";
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

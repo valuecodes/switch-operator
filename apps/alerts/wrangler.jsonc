@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "switch-operator-alerts",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+    },
+  },
+  // The union of every alert's `cron` (see src/alerts). Each alert runs only
+  // when the fired cron matches its declared `cron` string.
+  "triggers": {
+    "crons": ["0 8 * * *"],
+  },
+}

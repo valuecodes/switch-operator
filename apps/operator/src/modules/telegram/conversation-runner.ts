@@ -1,4 +1,5 @@
 import type { Logger } from "@repo/logger";
+import type { TelegramService } from "@repo/telegram";
 import { validateSourceUrl } from "@repo/url-validator";
 
 import { buildInitialMessages, OpenAiService } from "../../services/openai";
@@ -16,7 +17,6 @@ import {
   MAX_ACTIVE_SCHEDULES,
   ScheduleService,
 } from "../../services/schedule";
-import type { TelegramService } from "../../services/telegram";
 import type { AppEnv } from "../../types/env";
 import { markdownToTelegramHtml } from "../../utils/markdown-to-html";
 import {

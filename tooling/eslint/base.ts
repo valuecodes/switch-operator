@@ -76,6 +76,21 @@ export const baseConfig = defineConfig(
       curly: ["error", "all"],
       "import/no-default-export": "error",
       "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
+      // No barrel re-exports: export from the defining module and expose it via
+      // a package.json subpath, so consumers import from a stable, explicit path.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "ExportAllDeclaration",
+          message:
+            "No barrel re-exports — export from the defining module and expose it via a package.json subpath.",
+        },
+        {
+          selector: "ExportNamedDeclaration[source]",
+          message:
+            "No barrel re-exports — export from the defining module and expose it via a package.json subpath.",
+        },
+      ],
     },
   },
   {

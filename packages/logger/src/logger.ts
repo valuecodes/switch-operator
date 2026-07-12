@@ -1,7 +1,5 @@
 import type { LogEntry, LoggerConfig, LogLevel, LogMetadata } from "./types";
 
-export type { LogEntry, LoggerConfig, LogLevel, LogMetadata } from "./types";
-
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 0,
   info: 1,

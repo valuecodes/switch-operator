@@ -1,9 +1,9 @@
 import { Logger } from "@repo/logger";
+import { TelegramService } from "@repo/telegram";
 
 import { OpenAiService } from "./services/openai";
 import { MAX_RETRIES, ScheduleService } from "./services/schedule";
 import { scrapeUrl } from "./services/scrape";
-import { TelegramService } from "./services/telegram";
 import type { AppEnv } from "./types/env";
 import {
   extractWindows,
