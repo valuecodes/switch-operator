@@ -1,4 +1,5 @@
 import type { Logger } from "@repo/logger";
+import { TelegramService } from "@repo/telegram";
 import type { Context } from "hono";
 
 import { PendingActionService } from "../../services/pending-action";
@@ -6,7 +7,6 @@ import type { PendingAction } from "../../services/pending-action";
 import { PendingConversationService } from "../../services/pending-conversation";
 import { ScheduleService } from "../../services/schedule";
 import type { CreateScheduleInput } from "../../services/schedule";
-import { TelegramService } from "../../services/telegram";
 import type { AppEnv } from "../../types/env";
 import type {
   TelegramCallbackQuery,

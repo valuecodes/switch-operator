@@ -3,8 +3,6 @@ import type { z } from "zod";
 
 import type { HttpClientConfig, PostOptions, RequestOptions } from "./types";
 
-export type { HttpClientConfig, PostOptions, RequestOptions } from "./types";
-
 class HttpClientError extends Error {
   readonly status: number;
   readonly body: unknown;

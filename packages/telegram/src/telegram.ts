@@ -5,8 +5,8 @@ import type {
   AnswerCallbackQueryParams,
   EditMessageReplyMarkupParams,
   SendMessageParams,
-} from "../types/telegram";
-import { telegramApiResponseSchema } from "../types/telegram";
+} from "./types";
+import { telegramApiResponseSchema } from "./types";
 
 class TelegramService {
   private readonly client: HttpClient;

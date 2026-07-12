@@ -1,6 +1,7 @@
+import type { InlineKeyboardMarkup } from "@repo/telegram/types";
+
 import type { QuestionOption } from "../../services/pending-conversation";
 import type { CreateScheduleInput } from "../../services/schedule";
-import type { InlineKeyboardMarkup } from "../../types/telegram";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const QUESTION_BUTTON_LABEL_MAX = 32;
