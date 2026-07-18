@@ -21,8 +21,8 @@ const sp500Close: Alert = {
     }
 
     const latest = bars[0];
-    // All-time high close: the long-history weekly high, lifted by any fresher
-    // high among the recent daily closes.
+    // All-time high close: the highest weekly *close* from prior history,
+    // lifted by any fresher close among the recent daily bars.
     const ath = bars.reduce((max, bar) => Math.max(max, bar.close), priorHigh);
     const isNewAth = latest.close >= ath;
 

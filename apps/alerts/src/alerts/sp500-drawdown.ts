@@ -83,10 +83,10 @@ const sp500Drawdown: Alert = {
     // Bars are newest-first: [0] is today's close, [1] is the prior close.
     const [today, prev] = bars;
 
-    // ATH = the pre-window weekly high, lifted by the highest recent daily
-    // close. `priorHigh` excludes the daily window entirely (so it can't carry
-    // today's close), which lets `athPrev` drop today's bar cleanly and avoid a
-    // false recovery crossing when today prints a new high.
+    // ATH = the highest pre-window weekly *close*, lifted by the highest recent
+    // daily close. `priorHigh` excludes the daily window entirely (so it can't
+    // carry today's close), which lets `athPrev` drop today's bar cleanly and
+    // avoid a false recovery crossing when today prints a new high.
     const athToday = Math.max(priorHigh, highClose(bars));
     const athPrev = Math.max(priorHigh, highClose(bars.slice(1)));
 
