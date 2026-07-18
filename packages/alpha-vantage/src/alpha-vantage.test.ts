@@ -76,7 +76,11 @@ describe("AlphaVantageClient", () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
-    client = new AlphaVantageClient("test-key", createMockLogger());
+    // Throttling off by default so most tests stay fast; the serialization test
+    // opts back in with its own interval.
+    client = new AlphaVantageClient("test-key", createMockLogger(), {
+      minRequestIntervalMs: 0,
+    });
   });
 
   describe("getDailyTimeSeries", () => {
@@ -255,6 +259,34 @@ describe("AlphaVantageClient", () => {
 
       expect(series.symbol).toBe("SPY");
       expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("serializes distinct requests spaced by the configured interval", async () => {
+      const interval = 50;
+      const throttled = new AlphaVantageClient("test-key", createMockLogger(), {
+        minRequestIntervalMs: interval,
+      });
+      const starts: number[] = [];
+      mockFetch.mockImplementation((url: unknown) => {
+        starts.push(Date.now());
+        return Promise.resolve(
+          createJsonResponse(
+            String(url).includes("TIME_SERIES_WEEKLY")
+              ? weeklySuccessBody
+              : dailySuccessBody
+          )
+        );
+      });
+
+      // Fired in the same tick — without throttling both would hit the network
+      // simultaneously and risk the per-second burst limit.
+      await Promise.all([
+        throttled.getDailyTimeSeries("SPY"),
+        throttled.getWeeklyTimeSeries("SPY"),
+      ]);
+
+      expect(starts).toHaveLength(2);
+      expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(interval - 5);
     });
   });
 });
