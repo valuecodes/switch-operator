@@ -27,8 +27,15 @@ const spySeries = {
   ],
 };
 
+// Every `new AlphaVantageClient(...)` pushes here so the test can assert the
+// handler builds exactly one client and shares it across the due alerts.
+const clientInstances: object[] = [];
+
 vi.mock("@repo/alpha-vantage", () => ({
   AlphaVantageClient: class {
+    constructor() {
+      clientInstances.push(this);
+    }
     getDailyTimeSeries = () => Promise.resolve(spySeries);
     getWeeklyTimeSeries = () => Promise.resolve(spySeries);
   },
@@ -52,6 +59,7 @@ describe("handleScheduled", () => {
   beforeEach(() => {
     sendMessage.mockReset();
     sendMessage.mockResolvedValue({ ok: true });
+    clientInstances.length = 0;
   });
 
   it("sends the alert messages when the daily cron fires", async () => {
@@ -69,6 +77,14 @@ describe("handleScheduled", () => {
       expect(params.chat_id).toBe(12345);
       expect(params.parse_mode).toBe("HTML");
     }
+  });
+
+  it("builds one Alpha Vantage client and shares it across the due alerts", async () => {
+    await handleScheduled(makeEvent("0 8 * * *"), env, ctx);
+
+    // A single shared client means both SPY alerts de-duplicate their fetches
+    // instead of racing the free-tier burst limit with separate clients.
+    expect(clientInstances).toHaveLength(1);
   });
 
   it("does not send anything when no alert matches the fired cron", async () => {

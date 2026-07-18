@@ -183,4 +183,64 @@ describe("AlphaVantageClient", () => {
       );
     });
   });
+
+  describe("request de-duplication", () => {
+    it("collapses concurrent identical requests into a single fetch", async () => {
+      mockFetch.mockResolvedValue(createJsonResponse(dailySuccessBody));
+
+      const [a, b] = await Promise.all([
+        client.getDailyTimeSeries("SPY"),
+        client.getDailyTimeSeries("SPY"),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(a).toBe(b);
+    });
+
+    it("treats omitted and explicit compact output size as one request", async () => {
+      mockFetch.mockResolvedValue(createJsonResponse(dailySuccessBody));
+
+      await Promise.all([
+        client.getDailyTimeSeries("SPY"),
+        client.getDailyTimeSeries("SPY", { outputSize: "compact" }),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("caches daily and weekly for the same symbol separately", async () => {
+      // A fresh Response per call (bodies are single-read) with the shape the
+      // called endpoint expects.
+      mockFetch.mockImplementation((url: unknown) =>
+        Promise.resolve(
+          createJsonResponse(
+            String(url).includes("TIME_SERIES_WEEKLY")
+              ? weeklySuccessBody
+              : dailySuccessBody
+          )
+        )
+      );
+
+      await Promise.all([
+        client.getDailyTimeSeries("SPY"),
+        client.getWeeklyTimeSeries("SPY"),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("evicts a failed request so a later identical call retries", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("network down"));
+      mockFetch.mockResolvedValueOnce(createJsonResponse(dailySuccessBody));
+
+      await expect(client.getDailyTimeSeries("SPY")).rejects.toThrow(
+        "network down"
+      );
+
+      const series = await client.getDailyTimeSeries("SPY");
+
+      expect(series.symbol).toBe("SPY");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
 });

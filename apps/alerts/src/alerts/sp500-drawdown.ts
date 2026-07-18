@@ -1,4 +1,3 @@
-import { AlphaVantageClient } from "@repo/alpha-vantage";
 import type { DailyBar } from "@repo/alpha-vantage/types";
 
 import { fetchSp500 } from "./sp500";
@@ -67,11 +66,11 @@ const formatPercent = (fraction: number): string =>
 const sp500Drawdown: Alert = {
   name: "sp500-drawdown",
   cron: "0 8 * * *", // reuses the existing daily 08:00 UTC trigger
-  run: async ({ env, logger }) => {
-    const client = new AlphaVantageClient(env.ALPHA_VANTAGE_API_KEY, logger);
+  run: async ({ logger, alphaVantage }) => {
     // Free daily `compact` closes + the free weekly series for the ATH baseline
-    // (daily `full` history is a premium feature). See `fetchSp500`.
-    const { bars, priorHigh } = await fetchSp500(client);
+    // (daily `full` history is a premium feature). See `fetchSp500`. The client
+    // is shared across alerts so the fetch de-duplicates within the run.
+    const { bars, priorHigh } = await fetchSp500(alphaVantage);
 
     if (bars.length < 2) {
       logger.warn("need at least 2 SPY bars for drawdown", {
