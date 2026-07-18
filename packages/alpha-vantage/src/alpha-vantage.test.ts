@@ -208,7 +208,7 @@ describe("AlphaVantageClient", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it("caches daily and weekly for the same symbol separately", async () => {
+    it("de-duplicates daily and weekly concurrently as separate requests", async () => {
       // A fresh Response per call (bodies are single-read) with the shape the
       // called endpoint expects.
       mockFetch.mockImplementation((url: unknown) =>
@@ -229,7 +229,21 @@ describe("AlphaVantageClient", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it("evicts a failed request so a later identical call retries", async () => {
+    it("does not cache results — a call after the first settles refetches", async () => {
+      // Fresh Response per call so both sequential reads succeed.
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(createJsonResponse(dailySuccessBody))
+      );
+
+      await client.getDailyTimeSeries("SPY");
+      await client.getDailyTimeSeries("SPY");
+
+      // In-flight de-dup only: sequential calls each hit the network so the data
+      // stays fresh for a reused client.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not let a failed request poison a later identical call", async () => {
       mockFetch.mockRejectedValueOnce(new Error("network down"));
       mockFetch.mockResolvedValueOnce(createJsonResponse(dailySuccessBody));
 

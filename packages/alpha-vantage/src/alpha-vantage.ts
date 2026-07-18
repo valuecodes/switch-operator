@@ -39,17 +39,18 @@ class AlphaVantageError extends Error {
  * (matching how `@repo/telegram` uses it) — add `AbortSignal.timeout` here if
  * that becomes necessary.
  *
- * Identical requests are de-duplicated for the instance's lifetime: concurrent
- * and repeat calls with the same parameters share a single in-flight (or
- * already-resolved) HTTP request. This keeps the free tier's 1-request-per-second
- * burst limit safe when several callers (e.g. multiple alerts) fetch the same
- * series in the same run. A failed request is evicted so a later call can retry.
+ * Concurrent identical requests are de-duplicated: while a request with the
+ * same parameters is in flight, other callers share it instead of issuing their
+ * own. This keeps the free tier's 1-request-per-second burst limit safe when
+ * several callers (e.g. multiple alerts) fetch the same series in the same run.
+ * The entry is dropped once the request settles, so a client reused across
+ * cycles still fetches fresh data and a failure never poisons later calls.
  */
 class AlphaVantageClient {
   private readonly client: HttpClient;
   private readonly apiKey: string;
-  /** In-flight/resolved requests keyed by endpoint + params (see `memoize`). */
-  private readonly cache = new Map<string, Promise<DailyTimeSeries>>();
+  /** In-flight requests keyed by endpoint + params (see `memoize`). */
+  private readonly inFlight = new Map<string, Promise<DailyTimeSeries>>();
 
   constructor(apiKey: string, logger: Logger) {
     this.apiKey = apiKey;
@@ -108,24 +109,31 @@ class AlphaVantageClient {
   }
 
   /**
-   * Return the cached promise for `key`, or start `fetcher`, cache its promise
-   * (so concurrent callers share one HTTP request), and evict on rejection so a
-   * failed request isn't cached — a later identical call retries.
+   * Share an in-flight request: return the pending promise for `key` if one
+   * exists, otherwise start `fetcher` and register its promise so concurrent
+   * callers reuse it. The entry is removed once the request settles (success or
+   * failure), so this de-duplicates bursts without caching results — later calls
+   * fetch fresh data, and a failure never poisons a subsequent call.
    */
   private memoize(
     key: string,
     fetcher: () => Promise<DailyTimeSeries>
   ): Promise<DailyTimeSeries> {
-    const cached = this.cache.get(key);
-    if (cached !== undefined) {
-      return cached;
+    const pending = this.inFlight.get(key);
+    if (pending !== undefined) {
+      return pending;
     }
 
-    const promise = fetcher().catch((error: unknown) => {
-      this.cache.delete(key);
-      throw error;
-    });
-    this.cache.set(key, promise);
+    const promise = fetcher();
+    this.inFlight.set(key, promise);
+    const evict = () => {
+      if (this.inFlight.get(key) === promise) {
+        this.inFlight.delete(key);
+      }
+    };
+    // Settle in both directions; the rejection handler here keeps the eviction
+    // chain from surfacing as an unhandled rejection (callers await `promise`).
+    promise.then(evict, evict);
     return promise;
   }
 
