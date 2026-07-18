@@ -1,6 +1,7 @@
 import { AlphaVantageClient } from "@repo/alpha-vantage";
 import type { DailyBar } from "@repo/alpha-vantage/types";
 
+import { fetchSp500 } from "./sp500";
 import type { Alert } from "./types";
 
 type DrawdownLevel = {
@@ -50,11 +51,15 @@ const formatPercent = (fraction: number): string =>
 
 /**
  * Alerts when the S&P 500 (via SPY) crosses a drawdown level relative to its
- * all-time-high daily close — in either direction — and tells you how much of
- * your cash reserve to deploy (falling) or rebuild (recovering). Detection is
+ * all-time-high close — in either direction — and tells you how much of your
+ * cash reserve to deploy (falling) or rebuild (recovering). Detection is
  * stateless: it compares the two most recent daily closes, so a crossing is
  * reported exactly once, on the day the drawdown band changes. The alert runs at
  * 08:00 UTC (before the US open), so both bars are always completed closes.
+ *
+ * The ATH combines recent daily closes with the free weekly-close history (see
+ * `fetchSp500`), so deep history is a weekly-closing-high approximation rather
+ * than an exact daily-close ATH.
  *
  * Trade-off: if the worker misses a scheduled run, a crossing that happened on
  * the skipped trading day is not reported. Accepted to avoid adding persistence.
@@ -64,24 +69,26 @@ const sp500Drawdown: Alert = {
   cron: "0 8 * * *", // reuses the existing daily 08:00 UTC trigger
   run: async ({ env, logger }) => {
     const client = new AlphaVantageClient(env.ALPHA_VANTAGE_API_KEY, logger);
-    // `full` history is required to establish a real all-time high.
-    const series = await client.getDailyTimeSeries("SPY", {
-      outputSize: "full",
-    });
+    // Free daily `compact` closes + the free weekly series for the ATH baseline
+    // (daily `full` history is a premium feature). See `fetchSp500`.
+    const { bars, priorHigh } = await fetchSp500(client);
 
-    if (series.bars.length < 2) {
+    if (bars.length < 2) {
       logger.warn("need at least 2 SPY bars for drawdown", {
-        symbol: series.symbol,
-        count: series.bars.length,
+        count: bars.length,
       });
       return null;
     }
 
     // Bars are newest-first: [0] is today's close, [1] is the prior close.
-    const [today, prev] = series.bars;
+    const [today, prev] = bars;
 
-    const athToday = highClose(series.bars);
-    const athPrev = highClose(series.bars.slice(1));
+    // ATH = the pre-window weekly high, lifted by the highest recent daily
+    // close. `priorHigh` excludes the daily window entirely (so it can't carry
+    // today's close), which lets `athPrev` drop today's bar cleanly and avoid a
+    // false recovery crossing when today prints a new high.
+    const athToday = Math.max(priorHigh, highClose(bars));
+    const athPrev = Math.max(priorHigh, highClose(bars.slice(1)));
 
     const ddToday = (athToday - today.close) / athToday;
     const ddPrev = (athPrev - prev.close) / athPrev;

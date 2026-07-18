@@ -3,7 +3,11 @@ import type { Logger } from "@repo/logger";
 import { z } from "zod";
 
 import type { DailyTimeSeries } from "./types";
-import { alphaVantageErrorSchema, dailyResponseSchema } from "./types";
+import {
+  alphaVantageErrorSchema,
+  dailyResponseSchema,
+  weeklyResponseSchema,
+} from "./types";
 
 const BASE_URL = "https://www.alphavantage.co";
 
@@ -73,6 +77,35 @@ class AlphaVantageClient {
     }
 
     return dailyResponseSchema.parse(raw);
+  }
+
+  /**
+   * Fetch the weekly OHLCV timeseries for `symbol`. Unlike the daily endpoint,
+   * `TIME_SERIES_WEEKLY` returns the full multi-year history for free (no
+   * `outputsize` parameter, no premium gating) — use it to establish an
+   * all-time high without a paid plan.
+   *
+   * @throws {AlphaVantageError} on an API-level error (bad key/symbol, rate limit).
+   */
+  async getWeeklyTimeSeries(symbol: string): Promise<DailyTimeSeries> {
+    const raw = await this.client.get("/query", {
+      schema: rawResponseSchema,
+      // Passed as `query` (not baked into the path) so the API key stays out of logs.
+      query: {
+        function: "TIME_SERIES_WEEKLY",
+        symbol,
+        apikey: this.apiKey,
+      },
+    });
+
+    const apiError = alphaVantageErrorSchema.parse(raw);
+    const errorMessage =
+      apiError["Error Message"] ?? apiError.Note ?? apiError.Information;
+    if (errorMessage !== undefined) {
+      throw new AlphaVantageError(errorMessage);
+    }
+
+    return weeklyResponseSchema.parse(raw);
   }
 }
 
