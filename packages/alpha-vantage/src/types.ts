@@ -38,7 +38,7 @@ const alphaVantageErrorSchema = z
   .partial()
   .loose();
 
-const rawDailyBarSchema = z.object({
+const rawBarSchema = z.object({
   "1. open": z.string(),
   "2. high": z.string(),
   "3. low": z.string(),
@@ -46,43 +46,68 @@ const rawDailyBarSchema = z.object({
   "5. volume": z.string(),
 });
 
+type RawBar = z.infer<typeof rawBarSchema>;
+
+const toBar = (date: string, bar: RawBar): DailyBar => ({
+  date,
+  open: Number(bar["1. open"]),
+  high: Number(bar["2. high"]),
+  low: Number(bar["3. low"]),
+  close: Number(bar["4. close"]),
+  volume: Number(bar["5. volume"]),
+});
+
+/**
+ * Builds a schema for one of the OHLCV timeseries endpoints. They share the
+ * bar shape but differ in the series key (`Time Series (Daily)` vs
+ * `Weekly Time Series`) and where the time zone lives in `Meta Data` (daily
+ * puts it at `5. Time Zone`, weekly at `4. Time Zone`). Bars come out
+ * newest-first.
+ */
+const timeSeriesSchema = (seriesKey: string, timeZoneKey: string) =>
+  z
+    .object({
+      "Meta Data": z
+        .object({
+          "2. Symbol": z.string(),
+          "3. Last Refreshed": z.string(),
+          [timeZoneKey]: z.string(),
+        })
+        .loose(),
+      [seriesKey]: z.record(z.string(), rawBarSchema),
+    })
+    .transform((raw): DailyTimeSeries => {
+      const meta = raw["Meta Data"] as Record<string, string>;
+      const series = raw[seriesKey] as Record<string, RawBar>;
+      const bars = Object.entries(series)
+        .map(([date, bar]) => toBar(date, bar))
+        .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+      return {
+        symbol: meta["2. Symbol"],
+        lastRefreshed: meta["3. Last Refreshed"],
+        timeZone: meta[timeZoneKey],
+        bars,
+      };
+    });
+
 /**
  * Raw `TIME_SERIES_DAILY` success payload, transformed into the clean
  * {@link DailyTimeSeries} shape.
  */
-const dailyResponseSchema = z
-  .object({
-    "Meta Data": z
-      .object({
-        "2. Symbol": z.string(),
-        "3. Last Refreshed": z.string(),
-        "5. Time Zone": z.string(),
-      })
-      .loose(),
-    "Time Series (Daily)": z.record(z.string(), rawDailyBarSchema),
-  })
-  .transform((raw): DailyTimeSeries => {
-    const meta = raw["Meta Data"];
-    const bars = Object.entries(raw["Time Series (Daily)"])
-      .map(
-        ([date, bar]): DailyBar => ({
-          date,
-          open: Number(bar["1. open"]),
-          high: Number(bar["2. high"]),
-          low: Number(bar["3. low"]),
-          close: Number(bar["4. close"]),
-          volume: Number(bar["5. volume"]),
-        })
-      )
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
+const dailyResponseSchema = timeSeriesSchema(
+  "Time Series (Daily)",
+  "5. Time Zone"
+);
 
-    return {
-      symbol: meta["2. Symbol"],
-      lastRefreshed: meta["3. Last Refreshed"],
-      timeZone: meta["5. Time Zone"],
-      bars,
-    };
-  });
+/**
+ * Raw `TIME_SERIES_WEEKLY` success payload, transformed into the same
+ * {@link DailyTimeSeries} shape (a weekly bar is structurally identical).
+ */
+const weeklyResponseSchema = timeSeriesSchema(
+  "Weekly Time Series",
+  "4. Time Zone"
+);
 
-export { alphaVantageErrorSchema, dailyResponseSchema };
+export { alphaVantageErrorSchema, dailyResponseSchema, weeklyResponseSchema };
 export type { DailyBar, DailyTimeSeries };

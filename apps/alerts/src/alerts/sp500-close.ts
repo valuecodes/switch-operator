@@ -1,6 +1,6 @@
 import { AlphaVantageClient } from "@repo/alpha-vantage";
-import type { DailyBar } from "@repo/alpha-vantage/types";
 
+import { fetchSp500, SP500_SYMBOL } from "./sp500";
 import type { Alert } from "./types";
 
 /**
@@ -12,29 +12,27 @@ const sp500Close: Alert = {
   cron: "0 8 * * *", // reuses the existing daily 08:00 UTC trigger
   run: async ({ env, logger }) => {
     const client = new AlphaVantageClient(env.ALPHA_VANTAGE_API_KEY, logger);
-    // `full` history is required to establish a real all-time high.
-    const series = await client.getDailyTimeSeries("SPY", {
-      outputSize: "full",
-    });
-    if (series.bars.length === 0) {
-      logger.warn("no SPY bars returned", { symbol: series.symbol });
+    // Free daily `compact` closes + the free weekly series for the ATH baseline
+    // (daily `full` history is a premium feature). See `fetchSp500`.
+    const { bars, priorHigh } = await fetchSp500(client);
+    if (bars.length === 0) {
+      logger.warn("no SPY bars returned", { symbol: SP500_SYMBOL });
       return null;
     }
 
-    const latest = series.bars[0];
-    // The bar with the highest close; `latest` is at the ATH when it ties it.
-    const athBar = series.bars.reduce((max: DailyBar, bar: DailyBar) =>
-      bar.close > max.close ? bar : max
-    );
-    const isNewAth = latest.close >= athBar.close;
+    const latest = bars[0];
+    // All-time high close: the long-history weekly high, lifted by any fresher
+    // high among the recent daily closes.
+    const ath = bars.reduce((max, bar) => Math.max(max, bar.close), priorHigh);
+    const isNewAth = latest.close >= ath;
 
     const head = `📈 SPY close ${latest.date}: $${latest.close.toFixed(2)}`;
     if (isNewAth) {
       return `${head} — 🚀 all-time high`;
     }
 
-    const drawdown = (athBar.close - latest.close) / athBar.close;
-    return `${head} (−${(drawdown * 100).toFixed(1)}% from ATH $${athBar.close.toFixed(2)} on ${athBar.date})`;
+    const drawdown = (ath - latest.close) / ath;
+    return `${head} (−${(drawdown * 100).toFixed(1)}% from ATH $${ath.toFixed(2)})`;
   },
 };
 

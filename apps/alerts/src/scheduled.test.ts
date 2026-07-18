@@ -11,24 +11,26 @@ vi.mock("@repo/telegram", () => ({
   },
 }));
 
+const spySeries = {
+  symbol: "SPY",
+  lastRefreshed: "2024-01-05",
+  timeZone: "US/Eastern",
+  bars: [
+    {
+      date: "2024-01-05",
+      open: 468.3,
+      high: 469.13,
+      low: 464.45,
+      close: 467.28,
+      volume: 92955850,
+    },
+  ],
+};
+
 vi.mock("@repo/alpha-vantage", () => ({
   AlphaVantageClient: class {
-    getDailyTimeSeries = () =>
-      Promise.resolve({
-        symbol: "SPY",
-        lastRefreshed: "2024-01-05",
-        timeZone: "US/Eastern",
-        bars: [
-          {
-            date: "2024-01-05",
-            open: 468.3,
-            high: 469.13,
-            low: 464.45,
-            close: 467.28,
-            volume: 92955850,
-          },
-        ],
-      });
+    getDailyTimeSeries = () => Promise.resolve(spySeries);
+    getWeeklyTimeSeries = () => Promise.resolve(spySeries);
   },
 }));
 
