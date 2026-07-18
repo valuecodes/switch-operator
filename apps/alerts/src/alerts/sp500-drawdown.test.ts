@@ -1,3 +1,4 @@
+import { AlphaVantageClient } from "@repo/alpha-vantage";
 import type { DailyBar, DailyTimeSeries } from "@repo/alpha-vantage/types";
 import type { Logger } from "@repo/logger";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,7 +75,11 @@ const env = {
   ALPHA_VANTAGE_API_KEY: "test-key",
 };
 
-const run = () => sp500Drawdown.run({ env, logger: createMockLogger() });
+const run = () => {
+  const logger = createMockLogger();
+  const alphaVantage = new AlphaVantageClient("test-key", logger);
+  return sp500Drawdown.run({ env, logger, alphaVantage });
+};
 
 describe("sp500Drawdown", () => {
   beforeEach(() => {

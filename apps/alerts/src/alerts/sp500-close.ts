@@ -1,5 +1,3 @@
-import { AlphaVantageClient } from "@repo/alpha-vantage";
-
 import { fetchSp500, SP500_SYMBOL } from "./sp500";
 import type { Alert } from "./types";
 
@@ -10,11 +8,11 @@ import type { Alert } from "./types";
 const sp500Close: Alert = {
   name: "sp500-close",
   cron: "0 8 * * *", // reuses the existing daily 08:00 UTC trigger
-  run: async ({ env, logger }) => {
-    const client = new AlphaVantageClient(env.ALPHA_VANTAGE_API_KEY, logger);
+  run: async ({ logger, alphaVantage }) => {
     // Free daily `compact` closes + the free weekly series for the ATH baseline
-    // (daily `full` history is a premium feature). See `fetchSp500`.
-    const { bars, priorHigh } = await fetchSp500(client);
+    // (daily `full` history is a premium feature). See `fetchSp500`. The client
+    // is shared across alerts so the fetch de-duplicates within the run.
+    const { bars, priorHigh } = await fetchSp500(alphaVantage);
     if (bars.length === 0) {
       logger.warn("no SPY bars returned", { symbol: SP500_SYMBOL });
       return null;

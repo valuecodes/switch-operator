@@ -1,3 +1,4 @@
+import { AlphaVantageClient } from "@repo/alpha-vantage";
 import { Logger } from "@repo/logger";
 import { TelegramService } from "@repo/telegram";
 
@@ -14,6 +15,12 @@ const handleScheduled = async (
   const parsed = parseEnv(env);
   const telegram = new TelegramService(parsed.TELEGRAM_BOT_TOKEN, logger);
   const chatId = Number(parsed.ALLOWED_CHAT_ID);
+  // One client for the whole run so alerts fetching the same series share a
+  // single request instead of racing the free-tier burst limit.
+  const alphaVantage = new AlphaVantageClient(
+    parsed.ALPHA_VANTAGE_API_KEY,
+    logger
+  );
 
   const due = alerts.filter((alert) => alert.cron === event.cron);
   if (due.length === 0) {
@@ -25,7 +32,7 @@ const handleScheduled = async (
 
   const results = await Promise.allSettled(
     due.map(async (alert) => {
-      const message = await alert.run({ env: parsed, logger });
+      const message = await alert.run({ env: parsed, logger, alphaVantage });
       if (message === null) {
         logger.info("alert produced no message", { alert: alert.name });
         return;

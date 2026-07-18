@@ -1,3 +1,4 @@
+import type { AlphaVantageClient } from "@repo/alpha-vantage";
 import type { Logger } from "@repo/logger";
 
 import type { Env } from "../types/env";
@@ -5,6 +6,12 @@ import type { Env } from "../types/env";
 type AlertContext = {
   env: Env;
   logger: Logger;
+  /**
+   * Shared Alpha Vantage client for the run. Constructed once by the scheduled
+   * handler so alerts fetching the same series de-duplicate to one HTTP request
+   * (see `AlphaVantageClient`), staying under the free-tier burst limit.
+   */
+  alphaVantage: AlphaVantageClient;
 };
 
 type Alert = {
