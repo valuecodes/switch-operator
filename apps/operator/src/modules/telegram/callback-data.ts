@@ -5,7 +5,7 @@ type ParsedCallback =
 const parseCallbackData = (
   data: string | undefined
 ): ParsedCallback | undefined => {
-  if (!data) {
+  if (data === undefined || data === "") {
     return undefined;
   }
   if (data.startsWith("q:")) {

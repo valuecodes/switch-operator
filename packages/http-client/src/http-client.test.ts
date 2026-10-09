@@ -1,7 +1,7 @@
 import type { Logger } from "@repo/logger";
 import { z } from "zod";
 
-import { HttpClient, HttpClientError } from "../http-client";
+import { HttpClient, HttpClientError } from "./http-client";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -163,16 +163,13 @@ describe("HttpClient", () => {
         HttpClientError
       );
 
-      try {
-        mockFetch.mockResolvedValueOnce(
-          createJsonResponse({ error: "fail" }, 500)
-        );
-        await client.get("/fail", { schema });
-      } catch (err) {
-        expect(err).toBeInstanceOf(HttpClientError);
-        expect((err as HttpClientError).status).toBe(500);
-        expect((err as HttpClientError).body).toEqual({ error: "fail" });
-      }
+      mockFetch.mockResolvedValueOnce(
+        createJsonResponse({ error: "fail" }, 500)
+      );
+      const failure = client.get("/fail", { schema });
+      await expect(failure).rejects.toBeInstanceOf(HttpClientError);
+      await expect(failure).rejects.toHaveProperty("status", 500);
+      await expect(failure).rejects.toHaveProperty("body", { error: "fail" });
     });
 
     it("preserves non-JSON error bodies in HttpClientError", async () => {
@@ -183,13 +180,13 @@ describe("HttpClient", () => {
         })
       );
 
-      try {
-        await client.get("/fail", { schema });
-      } catch (err) {
-        expect(err).toBeInstanceOf(HttpClientError);
-        expect((err as HttpClientError).status).toBe(502);
-        expect((err as HttpClientError).body).toBe("<html>bad gateway</html>");
-      }
+      const failure = client.get("/fail", { schema });
+      await expect(failure).rejects.toBeInstanceOf(HttpClientError);
+      await expect(failure).rejects.toHaveProperty("status", 502);
+      await expect(failure).rejects.toHaveProperty(
+        "body",
+        "<html>bad gateway</html>"
+      );
     });
 
     it("handles empty error bodies without throwing SyntaxError", async () => {
@@ -199,13 +196,10 @@ describe("HttpClient", () => {
         })
       );
 
-      try {
-        await client.get("/unavailable", { schema });
-      } catch (err) {
-        expect(err).toBeInstanceOf(HttpClientError);
-        expect((err as HttpClientError).status).toBe(503);
-        expect((err as HttpClientError).body).toBeNull();
-      }
+      const failure = client.get("/unavailable", { schema });
+      await expect(failure).rejects.toBeInstanceOf(HttpClientError);
+      await expect(failure).rejects.toHaveProperty("status", 503);
+      await expect(failure).rejects.toHaveProperty("body", null);
     });
 
     it("throws on schema validation failure", async () => {

@@ -78,7 +78,7 @@ class HttpClient {
       status: response.status,
     });
 
-    return options.schema.parse(body) as z.infer<T>;
+    return options.schema.parse(body);
   }
 
   private async parseResponseBody(response: Response): Promise<unknown> {

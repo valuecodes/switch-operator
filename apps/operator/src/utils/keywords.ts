@@ -3,7 +3,7 @@
  * Returns [] on null, undefined, or malformed data. Never throws.
  */
 const parseKeywords = (raw: string | null | undefined): string[] => {
-  if (!raw) {
+  if (raw === null || raw === undefined || raw === "") {
     return [];
   }
   try {
@@ -64,13 +64,13 @@ const extractWindows = (
     .sort((a, b) => a[0] - b[0]);
 
   // Merge overlapping ranges
-  const merged: [number, number][] = [[ranges[0][0], ranges[0][1]]];
-  for (let i = 1; i < ranges.length; i++) {
-    const last = merged[merged.length - 1];
-    if (ranges[i][0] <= last[1]) {
-      last[1] = Math.max(last[1], ranges[i][1]);
+  const merged: [number, number][] = [];
+  for (const [start, end] of ranges) {
+    const last = merged.at(-1);
+    if (last !== undefined && start <= last[1]) {
+      last[1] = Math.max(last[1], end);
     } else {
-      merged.push([ranges[i][0], ranges[i][1]]);
+      merged.push([start, end]);
     }
   }
 

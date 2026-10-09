@@ -48,7 +48,7 @@ packages/
   http-client/         # Shared fetch wrapper with response validation
   logger/              # Shared structured logger used by apps
 tooling/
-  eslint/              # Shared ESLint config
+  github/              # CI setup action and gitleaks secrets scan
   prettier/            # Shared Prettier config
   typescript/          # Shared TypeScript config
 ```

@@ -2,7 +2,8 @@ import { and, eq, gt, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 
-import { pendingConversations } from "../db/schema";
+import { pendingConversations } from "~/db/schema";
+
 import { generateToken } from "./pending-action";
 
 type QuestionOptionValue = boolean | string | number;
@@ -93,10 +94,11 @@ class PendingConversationService {
           gt(pendingConversations.expiresAt, nowIso)
         )
       );
-    if (rows.length === 0) {
+    const [row] = rows;
+    if (row === undefined) {
       return undefined;
     }
-    return parseRow(rows[0]);
+    return parseRow(row);
   }
 
   async consumeByToken(
@@ -114,10 +116,11 @@ class PendingConversationService {
         )
       )
       .returning();
-    if (deleted.length === 0) {
+    const [row] = deleted;
+    if (row === undefined) {
       return undefined;
     }
-    return parseRow(deleted[0]);
+    return parseRow(row);
   }
 
   async clear(chatId: number): Promise<void> {
@@ -134,5 +137,5 @@ class PendingConversationService {
   }
 }
 
-export { PendingConversationService, TTL_MS };
-export type { PendingConversation, QuestionOption, QuestionOptionValue };
+export { PendingConversationService };
+export type { QuestionOption };

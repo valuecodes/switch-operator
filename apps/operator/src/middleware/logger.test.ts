@@ -4,9 +4,10 @@ import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { AppEnv } from "../../types/env";
-import { onErrorHandler } from "../error-handlers";
-import { loggerMiddleware } from "../logger";
+import type { AppEnv } from "~/types/env";
+
+import { onErrorHandler } from "./error-handlers";
+import { loggerMiddleware } from "./logger";
 
 const IdResponseSchema = z.object({ id: z.string() });
 const ErrorResponseSchema = z.object({ error: z.string() });
@@ -14,7 +15,7 @@ const ErrorResponseSchema = z.object({ error: z.string() });
 type ConsoleSpy = MockInstance<(...args: unknown[]) => void>;
 
 const parseLogEntry = (spy: ConsoleSpy, callIndex = 0): LogEntry => {
-  const call = spy.mock.calls[callIndex] as unknown[] | undefined;
+  const call = spy.mock.calls[callIndex];
   expect(call).toBeDefined();
   return JSON.parse(String(call?.[0])) as LogEntry;
 };

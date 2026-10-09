@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { AppEnv } from "../../types/env";
-import { loggerMiddleware } from "../logger";
-import { telegramIpMiddleware } from "../telegram-ip";
+import type { AppEnv } from "~/types/env";
+
+import { loggerMiddleware } from "./logger";
+import { telegramIpMiddleware } from "./telegram-ip";
 
 const createApp = () => {
   const app = new Hono<AppEnv>();
@@ -18,7 +19,7 @@ const sendRequest = (app: Hono<AppEnv>, ip?: string) => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (ip) {
+  if (ip !== undefined && ip !== "") {
     headers["cf-connecting-ip"] = ip;
   }
   return app.request("/webhook/telegram", {

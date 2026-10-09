@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { corsMiddleware } from "../cors";
+import { corsMiddleware } from "./cors";
 
 const createApp = () => {
   const app = new Hono();

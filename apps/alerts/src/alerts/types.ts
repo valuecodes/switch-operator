@@ -1,7 +1,7 @@
 import type { AlphaVantageClient } from "@repo/alpha-vantage";
 import type { Logger } from "@repo/logger";
 
-import type { Env } from "../types/env";
+import type { Env } from "~/types/env";
 
 type AlertContext = {
   env: Env;

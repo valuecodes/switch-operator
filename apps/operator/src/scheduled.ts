@@ -74,7 +74,7 @@ const handleScheduled = async (
   const results = await Promise.allSettled(
     claimed.map(async (schedule) => {
       // Monitor path
-      if (schedule.sourceUrl) {
+      if (schedule.sourceUrl !== null && schedule.sourceUrl !== "") {
         const urlCheck = validateSourceUrl(schedule.sourceUrl);
         if (!urlCheck.valid) {
           logger.error("monitor URL validation failed at execution", {
@@ -93,7 +93,7 @@ const handleScheduled = async (
         }
 
         let previousState: string | null = null;
-        if (schedule.stateJson) {
+        if (schedule.stateJson !== null && schedule.stateJson !== "") {
           try {
             const parsed = JSON.parse(schedule.stateJson) as Record<
               string,
@@ -189,9 +189,12 @@ const handleScheduled = async (
       // Reminder path
       let text: string;
       let formatAsHtml = false;
-      if (schedule.fixedMessage) {
+      if (schedule.fixedMessage !== null && schedule.fixedMessage !== "") {
         text = schedule.fixedMessage;
-      } else if (schedule.messagePrompt) {
+      } else if (
+        schedule.messagePrompt !== null &&
+        schedule.messagePrompt !== ""
+      ) {
         const openai = new OpenAiService(env.OPENAI_API_KEY, logger);
         text = await openai.reply(schedule.messagePrompt);
         if (text.length > RESPONSE_SIZE_LIMIT) {
@@ -225,9 +228,13 @@ const handleScheduled = async (
 
   // Handle failures — mark for retry
   const completionTime = new Date();
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
+  for (const [i, result] of results.entries()) {
     const schedule = claimed[i];
+    if (schedule === undefined) {
+      throw new Error(
+        `No claimed schedule for settled result at index ${String(i)}`
+      );
+    }
     if (result.status === "fulfilled") {
       const { lockLost } = await scheduleService.markSuccess(schedule);
       if (lockLost) {
@@ -238,12 +245,10 @@ const handleScheduled = async (
     }
 
     if (result.status === "rejected") {
+      const reason: unknown = result.reason;
       logger.error("scheduled message failed", {
         scheduleId: schedule.id,
-        error:
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason),
+        error: reason instanceof Error ? reason.message : String(reason),
       });
 
       const { exhausted, lockLost } = await scheduleService.markFailed(
@@ -265,13 +270,10 @@ const handleScheduled = async (
             chat_id: chatId,
             text: `⚠️ Schedule "${schedule.description}" failed ${String(MAX_RETRIES)} times — skipping until next run.`,
           });
-        } catch (notifyErr) {
+        } catch (error) {
           logger.error("failed to send retry-exhaustion notification", {
             scheduleId: schedule.id,
-            error:
-              notifyErr instanceof Error
-                ? notifyErr.message
-                : String(notifyErr),
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
@@ -279,10 +281,9 @@ const handleScheduled = async (
   }
 };
 
-const createScheduledHandler = () => {
-  return (event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
+const createScheduledHandler =
+  () => (event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
     ctx.waitUntil(handleScheduled(event, env, ctx));
   };
-};
 
-export { createScheduledHandler, handleScheduled };
+export { createScheduledHandler };

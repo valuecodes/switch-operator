@@ -33,6 +33,15 @@ const telegramApiResponseSchema = z
   })
   .loose();
 
+type SendMessageParams = z.infer<typeof sendMessageParamsSchema>;
+type AnswerCallbackQueryParams = z.infer<
+  typeof answerCallbackQueryParamsSchema
+>;
+type EditMessageReplyMarkupParams = z.infer<
+  typeof editMessageReplyMarkupParamsSchema
+>;
+type InlineKeyboardMarkup = z.infer<typeof inlineKeyboardMarkupSchema>;
+
 export {
   answerCallbackQueryParamsSchema,
   editMessageReplyMarkupParamsSchema,
@@ -41,11 +50,9 @@ export {
   telegramApiResponseSchema,
 };
 
-export type SendMessageParams = z.infer<typeof sendMessageParamsSchema>;
-export type AnswerCallbackQueryParams = z.infer<
-  typeof answerCallbackQueryParamsSchema
->;
-export type EditMessageReplyMarkupParams = z.infer<
-  typeof editMessageReplyMarkupParamsSchema
->;
-export type InlineKeyboardMarkup = z.infer<typeof inlineKeyboardMarkupSchema>;
+export type {
+  AnswerCallbackQueryParams,
+  EditMessageReplyMarkupParams,
+  InlineKeyboardMarkup,
+  SendMessageParams,
+};

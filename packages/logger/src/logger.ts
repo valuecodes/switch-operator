@@ -59,9 +59,8 @@ export class Logger {
     this.log("error", message, metadata);
   };
 
-  private readonly isEnabled = (level: LogLevel): boolean => {
-    return LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[this.minLevel];
-  };
+  private readonly isEnabled = (level: LogLevel): boolean =>
+    LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[this.minLevel];
 
   private readonly log = (
     level: LogLevel,

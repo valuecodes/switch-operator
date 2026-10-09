@@ -4,9 +4,10 @@ import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
 import { timingSafeEqual } from "hono/utils/buffer";
 
-import { telegramIpMiddleware } from "../../middleware/telegram-ip";
-import type { AppEnv } from "../../types/env";
-import { telegramUpdateSchema } from "../../types/telegram";
+import { telegramIpMiddleware } from "~/middleware/telegram-ip";
+import type { AppEnv } from "~/types/env";
+import { telegramUpdateSchema } from "~/types/telegram";
+
 import { handleWebhook } from "./controller";
 
 const telegramRoutes = new Hono<AppEnv>();
@@ -16,13 +17,14 @@ const verifyTelegramSecret = createMiddleware<AppEnv>(async (c, next) => {
   const secret = c.req.header("x-telegram-bot-api-secret-token");
 
   if (
-    !secret ||
+    secret === undefined ||
+    secret === "" ||
     !(await timingSafeEqual(secret, c.env.TELEGRAM_WEBHOOK_SECRET))
   ) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  await next();
+  return next();
 });
 
 telegramRoutes.post(
@@ -37,6 +39,7 @@ telegramRoutes.post(
     if (!result.success) {
       return c.json({ error: "Invalid payload" }, 400);
     }
+    return undefined;
   }),
   handleWebhook
 );

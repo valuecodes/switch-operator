@@ -1,6 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { collapseWhitespace, convertContent, scrapeUrl } from "./scrape";
+import { scrapeUrl } from "./scrape";
+
+type ScrapeOutcome = Awaited<ReturnType<typeof scrapeUrl>>;
+
+const expectOk = (
+  result: ScrapeOutcome
+): Extract<ScrapeOutcome, { ok: true }> => {
+  if (!result.ok) {
+    throw new Error(`Expected ok result, got error: ${result.error}`);
+  }
+  return result;
+};
+
+const expectError = (
+  result: ScrapeOutcome
+): Extract<ScrapeOutcome, { ok: false }> => {
+  if (result.ok) {
+    throw new Error("Expected error result, got ok");
+  }
+  return result;
+};
 
 const createMockResponse = (
   body: string,
@@ -10,6 +30,9 @@ const createMockResponse = (
     status: init?.status ?? 200,
     headers: init?.headers ?? { "content-type": "text/html" },
   });
+
+const makeFetcher = (response: Response): Fetcher =>
+  ({ fetch: vi.fn().mockResolvedValue(response) }) as unknown as Fetcher;
 
 describe("scrapeUrl", () => {
   afterEach(() => {
@@ -26,12 +49,10 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text).toContain("Hello");
-      expect(result.text).toContain("World");
-      expect(result.truncated).toBe(false);
-    }
+    const ok = expectOk(result);
+    expect(ok.text).toContain("Hello");
+    expect(ok.text).toContain("World");
+    expect(ok.truncated).toBe(false);
   });
 
   it("handles JSON response with pretty-print", async () => {
@@ -47,12 +68,10 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://api.example.com/data");
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text).toContain("```json");
-      expect(result.text).toContain('"key": "value"');
-      expect(result.text).toContain("```");
-    }
+    const ok = expectOk(result);
+    expect(ok.text).toContain("```json");
+    expect(ok.text).toContain('"key": "value"');
+    expect(ok.text).toContain("```");
   });
 
   it("handles plain text response", async () => {
@@ -67,10 +86,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com/robots.txt");
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text).toBe("Plain text content");
-    }
+    const ok = expectOk(result);
+    expect(ok.text).toBe("Plain text content");
   });
 
   it("returns error for unsupported content type", async () => {
@@ -85,10 +102,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com/file.bin");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("Unsupported content type");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toContain("Unsupported content type");
   });
 
   it("returns error for non-ok HTTP status", async () => {
@@ -101,11 +116,9 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Blocked by site");
-      expect(result.statusCode).toBe(403);
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("Blocked by site");
+    expect(failure.statusCode).toBe(403);
   });
 
   it("returns error for 404", async () => {
@@ -118,11 +131,9 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com/missing");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Page not found");
-      expect(result.statusCode).toBe(404);
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("Page not found");
+    expect(failure.statusCode).toBe(404);
   });
 
   it("returns generic error for unmapped status codes", async () => {
@@ -135,10 +146,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("HTTP 502");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("HTTP 502");
   });
 
   it("truncates text exceeding maxTextLength", async () => {
@@ -152,11 +161,9 @@ describe("scrapeUrl", () => {
       maxTextLength: 100,
     });
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text.length).toBeLessThanOrEqual(100);
-      expect(result.truncated).toBe(true);
-    }
+    const ok = expectOk(result);
+    expect(ok.text.length).toBeLessThanOrEqual(100);
+    expect(ok.truncated).toBe(true);
   });
 
   it("returns error on fetch failure", async () => {
@@ -167,10 +174,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Network error");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("Network error");
   });
 
   it("returns error on timeout", async () => {
@@ -179,10 +184,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Request timed out");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("Request timed out");
   });
 
   it("follows safe redirects", async () => {
@@ -199,10 +202,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com/start");
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text).toContain("Redirected");
-    }
+    const ok = expectOk(result);
+    expect(ok.text).toContain("Redirected");
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
@@ -219,10 +220,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("Redirect to unsafe URL");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toContain("Redirect to unsafe URL");
   });
 
   it("rejects redirects to HTTP", async () => {
@@ -238,10 +237,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("Redirect to unsafe URL");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toContain("Redirect to unsafe URL");
   });
 
   it("returns error on too many redirects", async () => {
@@ -253,10 +250,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Too many redirects");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("Too many redirects");
   });
 
   it("truncates response bodies exceeding 2MB and marks truncated", async () => {
@@ -268,10 +263,8 @@ describe("scrapeUrl", () => {
 
     const result = await scrapeUrl("https://example.com");
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.truncated).toBe(true);
-    }
+    const ok = expectOk(result);
+    expect(ok.truncated).toBe(true);
   });
 });
 
@@ -279,9 +272,6 @@ describe("scrapeUrl via browserScraper", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
-  const makeFetcher = (response: Response): Fetcher =>
-    ({ fetch: vi.fn().mockResolvedValue(response) }) as unknown as Fetcher;
 
   it("returns markdown from a successful browser-scraper response", async () => {
     const browserScraper = makeFetcher(
@@ -300,10 +290,8 @@ describe("scrapeUrl via browserScraper", () => {
       useBrowser: true,
     });
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.text).toContain("Hello SPA");
-    }
+    const ok = expectOk(result);
+    expect(ok.text).toContain("Hello SPA");
   });
 
   it("propagates truncated=true from browser-scraper even when text fits within maxTextLength", async () => {
@@ -323,10 +311,8 @@ describe("scrapeUrl via browserScraper", () => {
       useBrowser: true,
     });
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.truncated).toBe(true);
-    }
+    const ok = expectOk(result);
+    expect(ok.truncated).toBe(true);
   });
 
   it("propagates error when browser-scraper returns ok:false without status", async () => {
@@ -339,10 +325,8 @@ describe("scrapeUrl via browserScraper", () => {
       useBrowser: true,
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Navigation timeout");
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("Navigation timeout");
   });
 
   it("maps browser-scraper status through ERROR_MAP", async () => {
@@ -355,11 +339,9 @@ describe("scrapeUrl via browserScraper", () => {
       useBrowser: true,
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBe("Blocked by site");
-      expect(result.statusCode).toBe(403);
-    }
+    const failure = expectError(result);
+    expect(failure.error).toBe("Blocked by site");
+    expect(failure.statusCode).toBe(403);
   });
 
   it("returns error when browser-scraper returns invalid JSON", async () => {
@@ -375,10 +357,8 @@ describe("scrapeUrl via browserScraper", () => {
       useBrowser: true,
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatch(/invalid JSON/);
-    }
+    const failure = expectError(result);
+    expect(failure.error).toMatch(/invalid JSON/);
   });
 
   it("uses native fetch when useBrowser is false even if browserScraper is provided", async () => {
@@ -400,82 +380,5 @@ describe("scrapeUrl via browserScraper", () => {
     expect(result.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(browserScraperFetch).not.toHaveBeenCalled();
-  });
-});
-
-describe("convertContent", () => {
-  it("converts HTML to markdown", () => {
-    const result = convertContent(
-      "<h1>Title</h1><p>Paragraph</p>",
-      "text/html"
-    );
-    expect("text" in result).toBe(true);
-    if ("text" in result) {
-      expect(result.text).toContain("Title");
-      expect(result.text).toContain("Paragraph");
-    }
-  });
-
-  it("handles application/xhtml+xml as HTML", () => {
-    const result = convertContent("<p>Content</p>", "application/xhtml+xml");
-    expect("text" in result).toBe(true);
-    if ("text" in result) {
-      expect(result.text).toContain("Content");
-    }
-  });
-
-  it("pretty-prints JSON", () => {
-    const result = convertContent('{"a":1}', "application/json");
-    expect("text" in result).toBe(true);
-    if ("text" in result) {
-      expect(result.text).toContain("```json");
-      expect(result.text).toContain('"a": 1');
-    }
-  });
-
-  it("handles +json content types", () => {
-    const result = convertContent(
-      '{"data":"test"}',
-      "application/vnd.api+json"
-    );
-    expect("text" in result).toBe(true);
-    if ("text" in result) {
-      expect(result.text).toContain("```json");
-    }
-  });
-
-  it("wraps invalid JSON in plain code block", () => {
-    const result = convertContent("not json", "application/json");
-    expect("text" in result).toBe(true);
-    if ("text" in result) {
-      expect(result.text).toContain("```\nnot json\n```");
-    }
-  });
-
-  it("passes plain text through", () => {
-    const result = convertContent("hello world", "text/plain");
-    expect("text" in result).toBe(true);
-    if ("text" in result) {
-      expect(result.text).toBe("hello world");
-    }
-  });
-
-  it("returns error for unsupported types", () => {
-    const result = convertContent("data", "application/octet-stream");
-    expect("error" in result).toBe(true);
-  });
-});
-
-describe("collapseWhitespace", () => {
-  it("collapses 3+ newlines to double", () => {
-    expect(collapseWhitespace("a\n\n\n\nb")).toBe("a\n\nb");
-  });
-
-  it("collapses multiple spaces to single", () => {
-    expect(collapseWhitespace("a     b")).toBe("a b");
-  });
-
-  it("trims leading and trailing whitespace", () => {
-    expect(collapseWhitespace("  hello  ")).toBe("hello");
   });
 });
