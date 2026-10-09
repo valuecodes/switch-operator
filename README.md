@@ -20,20 +20,26 @@ The current feature set includes:
 - **Messaging:** Telegram Bot API
 - **LLM:** OpenAI API
 - **Validation:** Zod
-- **Monorepo:** pnpm workspaces
+- **Monorepo:** pnpm workspaces + Turborepo
+- **Tooling:** oxlint (type-aware), Prettier, Knip
 
 ## Structure
 
 ```
 apps/
-  operator/     # Cloudflare Worker (Telegram bot)
+  operator/         # Cloudflare Worker (Telegram bot)
+  browser-scraper/  # Cloudflare Worker (headless browser scraping)
+  alerts/           # Cloudflare Worker (scheduled market alerts)
 packages/
-  http-client/  # Shared fetch wrapper with response validation
-  logger/       # Shared structured logger
+  alpha-vantage/    # Alpha Vantage market data client
+  http-client/      # Shared fetch wrapper with response validation
+  logger/           # Shared structured logger
+  telegram/         # Telegram Bot API client
+  url-validator/    # Safety policy checks for user-supplied URLs
 tooling/
-  eslint/       # Shared ESLint config
-  prettier/     # Shared Prettier config
-  typescript/   # Shared TypeScript config
+  github/           # CI setup action and gitleaks secrets scan
+  prettier/         # Shared Prettier config
+  typescript/       # Shared TypeScript config
 ```
 
 ## Flow
@@ -57,15 +63,17 @@ flowchart TD
 
 ## Development
 
-Requires Node 24.12.0 (see `.nvmrc`) and pnpm.
+Requires Node 24.21.0 (see `.nvmrc`) and pnpm 12 (see `packageManager`).
 
 ```sh
 pnpm install          # install dependencies
 pnpm dev              # start local dev server
 pnpm build            # build all workspaces
 pnpm typecheck        # type checking
-pnpm lint             # linting
+pnpm lint             # oxlint
+pnpm knip             # unused files, exports and dependencies
 pnpm test             # run tests
+pnpm secrets:scan     # gitleaks over git history
 pnpm format:check     # check formatting
 pnpm format           # fix formatting
 ```

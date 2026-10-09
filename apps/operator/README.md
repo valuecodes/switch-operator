@@ -96,7 +96,7 @@ pnpm --filter @repo/operator set-webhook \
 | `pnpm --filter @repo/operator db:migrate:local`              | Apply local D1 migrations     |
 | `pnpm --filter @repo/operator db:migrate:remote`             | Apply remote D1 migrations    |
 | `pnpm typecheck`                                             | Run TypeScript type checking  |
-| `pnpm lint`                                                  | Run ESLint                    |
+| `pnpm lint`                                                  | Run oxlint (repo-wide)        |
 | `pnpm test`                                                  | Run tests                     |
 | `pnpm --filter @repo/operator set-webhook <url> [-- --prod]` | Register Telegram webhook URL |
 
