@@ -3,4 +3,56 @@ packages:
   - "packages/*"
   - "tooling/*"
 
+# Versions used by more than one package, referenced as `catalog:`. Bump with
+# `pnpm up --latest -r <pkg>`, which rewrites only this file.
+#
+# Not here: `@repo/*` deps (stay `workspace:*`) and single-consumer deps (pinned
+# inline in that manifest). Scoped keys must be double-quoted.
+catalog:
+  # `typescript` is the native (Go) compiler; its binary is still `tsc`.
+  "@types/node": 24.13.6
+  prettier: 3.9.9
+  typescript: 7.0.2
+  vitest: 5.0.1
+
+  # Loaded by the root manifest and tooling/prettier.
+  "@ianvs/prettier-plugin-sort-imports": 4.7.1
+
+  # Shared by the Cloudflare Workers apps and packages.
+  "@cloudflare/workers-types": 5.20260925.1
+  wrangler: 4.140.0
+  zod: 4.6.5
+
+# Makes `pnpm add` / `pnpm update` use the catalog and reject conflicting
+# versions. Plain `pnpm install` never evaluates it, so it is an authoring
+# guardrail, not a CI check.
+catalogMode: strict
+
+# Security floors for transitive deps whose parents still resolve a vulnerable
+# version. Drop an entry once `pnpm audit` stays clean without it.
+overrides:
+  # drizzle-kit > @esbuild-kit/core-utils pins esbuild 0.18 (GHSA-67mh-4wv8-2f99).
+  esbuild: ">=0.28.1"
+  # openai, wrangler > miniflare.
+  undici: ^7.29.1
+
+allowBuilds:
+  # Still used by Vitest's transforms and Wrangler's bundler.
+  esbuild: true
+  # Wrangler's local runtime. Its binary ships in the optional
+  # @cloudflare/workerd-<platform> package, so the postinstall (a check plus a
+  # fallback download) isn't needed. It has to be listed, even as false, or the
+  # install fails with ERR_PNPM_IGNORED_BUILDS.
+  workerd: false
+
+# 14 days, in minutes: a new release is not resolvable until it is this old.
+# So `pnpm up --latest` deliberately skips fresh releases; use
+# `minimumReleaseAgeExclude` if one package must move faster.
 minimumReleaseAge: 20160
+
+# Fails when a version has weaker trust evidence (provenance, trusted
+# publishing) than an earlier one, the usual sign of a hijacked account.
+# Also re-checked on `--frozen-lockfile` installs. If a downgrade is
+# legitimate, exclude that exact version in `trustPolicyExclude` with a reason,
+# never a bare package name.
+trustPolicy: no-downgrade

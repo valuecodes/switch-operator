@@ -6,37 +6,35 @@
     "dev": "wrangler dev --test-scheduled",
     "deploy": "wrangler deploy",
     "typecheck": "tsc",
-    "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "set-webhook": "tsx scripts/set-webhook.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply switch-operator-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply switch-operator-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply switch-operator-db --remote",
+    "clean": "rm -rf .turbo node_modules .cache .wrangler"
   },
   "dependencies": {
-    "@hono/zod-validator": "0.7.6",
+    "@hono/zod-validator": "0.9.1",
     "@repo/http-client": "workspace:*",
     "@repo/logger": "workspace:*",
     "@repo/telegram": "workspace:*",
     "@repo/url-validator": "workspace:*",
-    "drizzle-orm": "0.45.2",
-    "hono": "4.12.27",
+    "drizzle-orm": "0.45.3",
+    "hono": "4.13.9",
     "node-html-markdown": "2.0.0",
-    "openai": "6.34.0",
-    "zod": "4.3.6"
+    "openai": "7.23.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "4.20260412.1",
-    "@repo/eslint": "workspace:*",
+    "@cloudflare/workers-types": "catalog:",
     "@repo/prettier": "workspace:*",
     "@repo/typescript": "workspace:*",
-    "@types/node": "25.6.0",
-    "drizzle-kit": "0.31.10",
-    "eslint": "9.39.1",
-    "prettier": "3.8.2",
-    "tsx": "4.21.0",
-    "typescript": "6.0.2",
-    "vitest": "4.1.4",
-    "wrangler": "4.81.1"
-  }
+    "@types/node": "catalog:",
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "prettier": "@repo/prettier"
 }

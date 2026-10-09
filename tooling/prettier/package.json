@@ -6,12 +6,15 @@
     ".": "./prettier.config.ts"
   },
   "devDependencies": {
-    "@ianvs/prettier-plugin-sort-imports": "4.7.1",
+    "@ianvs/prettier-plugin-sort-imports": "catalog:",
     "@repo/typescript": "workspace:*",
-    "@types/node": "25.6.0",
-    "prettier": "3.8.2",
-    "prettier-plugin-tailwindcss": "0.7.2",
-    "typescript": "6.0.2"
+    "@types/node": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
   },
-  "prettier": "@repo/prettier"
+  "prettier": "@repo/prettier",
+  "scripts": {
+    "typecheck": "tsc",
+    "clean": "rm -rf .turbo node_modules .cache"
+  }
 }

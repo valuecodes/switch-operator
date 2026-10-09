@@ -1,5 +1,34 @@
+# Dependencies
 node_modules
+
+# Turbo / Wrangler
+.turbo
+.cache
+.wrangler
+
+# Local git worktrees
+.worktrees/
+
+# Build Outputs
+dist
+build
+
+# Logs
+logs
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
 .dev.vars
 .prod.vars
-.env
-.wrangler
+*.local
+
+# Editors
+.idea
+*.suo
+*.sw?
+
+# Misc
+.DS_Store

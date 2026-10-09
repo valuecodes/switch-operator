@@ -4,8 +4,5 @@
   "private": true,
   "files": [
     "*.json"
-  ],
-  "scripts": {
-    "format": "prettier --write ."
-  }
+  ]
 }
