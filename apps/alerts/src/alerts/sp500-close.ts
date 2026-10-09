@@ -13,12 +13,12 @@ const sp500Close: Alert = {
     // (daily `full` history is a premium feature). See `fetchSp500`. The client
     // is shared across alerts so the fetch de-duplicates within the run.
     const { bars, priorHigh } = await fetchSp500(alphaVantage);
-    if (bars.length === 0) {
+    const [latest] = bars;
+    if (latest === undefined) {
       logger.warn("no SPY bars returned", { symbol: SP500_SYMBOL });
       return null;
     }
 
-    const latest = bars[0];
     // All-time high close: the highest weekly *close* from prior history,
     // lifted by any fresher close among the recent daily bars.
     const ath = bars.reduce((max, bar) => Math.max(max, bar.close), priorHigh);

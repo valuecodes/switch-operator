@@ -55,4 +55,3 @@ const fetchSp500 = async (client: AlphaVantageClient): Promise<Sp500Data> => {
 };
 
 export { fetchSp500, SP500_SYMBOL };
-export type { Sp500Data };

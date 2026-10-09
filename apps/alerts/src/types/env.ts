@@ -10,5 +10,5 @@ type Env = z.infer<typeof envSchema>;
 
 const parseEnv = (env: unknown): Env => envSchema.parse(env);
 
-export { envSchema, parseEnv };
+export { parseEnv };
 export type { Env };

@@ -55,16 +55,14 @@ const weeklyFromCloses = (closes: number[]): DailyTimeSeries => ({
   symbol: "SPY",
   lastRefreshed: "2026-06-26",
   timeZone: "US/Eastern",
-  bars: closes.map(
-    (close, i): DailyBar => ({
-      date: `2026-06-${String(26 - i * 7).padStart(2, "0")}`,
-      open: close,
-      high: close,
-      low: close,
-      close,
-      volume: 5_000_000,
-    })
-  ),
+  bars: closes.map((close, i): DailyBar => ({
+    date: `2026-06-${String(26 - i * 7).padStart(2, "0")}`,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: 5_000_000,
+  })),
 });
 
 const env = {

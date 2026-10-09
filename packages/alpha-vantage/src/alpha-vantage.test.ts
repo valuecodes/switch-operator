@@ -157,8 +157,8 @@ describe("AlphaVantageClient", () => {
       expect(series.bars).toHaveLength(2);
 
       const [latest] = series.bars;
-      expect(latest.date).toBe("2024-01-05");
-      expect(latest.close).toBe(467.28);
+      expect(latest?.date).toBe("2024-01-05");
+      expect(latest?.close).toBe(467.28);
     });
 
     it("sends the expected query parameters without outputsize", async () => {
@@ -285,8 +285,11 @@ describe("AlphaVantageClient", () => {
         throttled.getWeeklyTimeSeries("SPY"),
       ]);
 
-      expect(starts).toHaveLength(2);
-      expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(interval - 5);
+      const [first, second] = starts;
+      if (first === undefined || second === undefined) {
+        throw new Error("expected two request start times");
+      }
+      expect(second - first).toBeGreaterThanOrEqual(interval - 5);
     });
   });
 });
