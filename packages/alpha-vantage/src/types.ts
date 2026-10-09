@@ -83,12 +83,19 @@ const timeSeriesSchema = (seriesKey: string, timeZoneKey: string) =>
         .map(([date, bar]) => toBar(date, bar))
         .sort((a, b) => (a.date < b.date ? 1 : -1));
 
-      return {
-        symbol: meta["2. Symbol"],
-        lastRefreshed: meta["3. Last Refreshed"],
-        timeZone: meta[timeZoneKey],
-        bars,
-      };
+      const symbol = meta["2. Symbol"];
+      const lastRefreshed = meta["3. Last Refreshed"];
+      const timeZone = meta[timeZoneKey];
+      // The object schema above already requires all three keys.
+      if (
+        symbol === undefined ||
+        lastRefreshed === undefined ||
+        timeZone === undefined
+      ) {
+        throw new Error("Alpha Vantage Meta Data is missing required fields");
+      }
+
+      return { symbol, lastRefreshed, timeZone, bars };
     });
 
 /**

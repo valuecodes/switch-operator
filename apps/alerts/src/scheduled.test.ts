@@ -22,7 +22,7 @@ const spySeries = {
       high: 469.13,
       low: 464.45,
       close: 467.28,
-      volume: 92955850,
+      volume: 92_955_850,
     },
   ],
 };
@@ -74,7 +74,7 @@ describe("handleScheduled", () => {
       ])
     );
     for (const [params] of sendMessage.mock.calls) {
-      expect(params.chat_id).toBe(12345);
+      expect(params.chat_id).toBe(12_345);
       expect(params.parse_mode).toBe("HTML");
     }
   });

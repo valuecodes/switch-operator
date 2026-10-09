@@ -50,7 +50,7 @@ const handleScheduled = async (
   results.forEach((result, i) => {
     if (result.status === "rejected") {
       logger.error("alert failed", {
-        alert: due[i].name,
+        alert: due[i]?.name,
         error:
           result.reason instanceof Error
             ? result.reason.message

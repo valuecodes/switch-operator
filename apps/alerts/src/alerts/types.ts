@@ -30,4 +30,4 @@ type Alert = {
   run: (ctx: AlertContext) => Promise<string | null>;
 };
 
-export type { Alert, AlertContext };
+export type { Alert };

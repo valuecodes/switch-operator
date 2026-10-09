@@ -72,15 +72,14 @@ const sp500Drawdown: Alert = {
     // is shared across alerts so the fetch de-duplicates within the run.
     const { bars, priorHigh } = await fetchSp500(alphaVantage);
 
-    if (bars.length < 2) {
+    // Bars are newest-first: [0] is today's close, [1] is the prior close.
+    const [today, prev] = bars;
+    if (today === undefined || prev === undefined) {
       logger.warn("need at least 2 SPY bars for drawdown", {
         count: bars.length,
       });
       return null;
     }
-
-    // Bars are newest-first: [0] is today's close, [1] is the prior close.
-    const [today, prev] = bars;
 
     // ATH = the highest pre-window weekly *close*, lifted by the highest recent
     // daily close. `priorHigh` excludes the daily window entirely (so it can't
@@ -106,7 +105,11 @@ const sp500Drawdown: Alert = {
       const crossed = DRAWDOWN_LEVELS.filter(
         (l) => l.threshold > bandPrev && l.threshold <= bandToday
       );
+      // `bandToday` is itself a level threshold, so `crossed` is never empty.
       const deepest = crossed.at(-1);
+      if (deepest === undefined) {
+        throw new Error(`no drawdown level crossed for band ${bandToday}`);
+      }
       const deploySum = crossed.reduce((sum, l) => sum + l.deploy, 0);
       const action =
         deploySum > 0
@@ -124,7 +127,10 @@ const sp500Drawdown: Alert = {
       (l) => l.threshold > bandToday && l.threshold <= bandPrev
     );
     // Deepest level reclaimed (crossed is ascending by threshold).
-    const reclaimed = crossed.at(-1).threshold;
+    const reclaimed = crossed.at(-1)?.threshold;
+    if (reclaimed === undefined) {
+      throw new Error(`no drawdown level reclaimed for band ${bandPrev}`);
+    }
     const refillSum = crossed.reduce((sum, l) => sum + l.deploy, 0);
     const action =
       refillSum > 0
@@ -138,4 +144,4 @@ const sp500Drawdown: Alert = {
   },
 };
 
-export { sp500Drawdown, DRAWDOWN_LEVELS };
+export { sp500Drawdown };
