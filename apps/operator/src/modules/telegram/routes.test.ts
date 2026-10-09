@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { onErrorHandler } from "../../middleware/error-handlers";
+import { loggerMiddleware } from "../../middleware/logger";
+import type { AppEnv } from "../../types/env";
+import { TELEGRAM_WEBHOOK_MAX_BODY_BYTES, telegramRoutes } from "./routes";
+
 const openaiCreateMock = vi.fn().mockResolvedValue({
   choices: [{ message: { content: "AI response" } }],
 });
@@ -39,11 +44,6 @@ vi.mock("../../services/pending-conversation", () => ({
     clear = conversationClearMock;
   },
 }));
-
-import { onErrorHandler } from "../../middleware/error-handlers";
-import { loggerMiddleware } from "../../middleware/logger";
-import type { AppEnv } from "../../types/env";
-import { TELEGRAM_WEBHOOK_MAX_BODY_BYTES, telegramRoutes } from "./routes";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -909,8 +909,7 @@ describe("POST /webhook/telegram — callback_query", () => {
       // The OpenAI call should have received messages with a tool result that
       // carries the raw boolean (NOT a string).
       const openaiCall = openaiCreateMock.mock.calls.at(-1) as
-        | [{ messages: { role: string; content?: string }[] }]
-        | undefined;
+        [{ messages: { role: string; content?: string }[] }] | undefined;
       expect(openaiCall).toBeDefined();
       if (!openaiCall) {
         return;

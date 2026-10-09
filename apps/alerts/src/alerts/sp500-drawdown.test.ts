@@ -37,16 +37,14 @@ const seriesFromCloses = (closes: number[]): DailyTimeSeries => ({
   symbol: "SPY",
   lastRefreshed: "2026-07-11",
   timeZone: "US/Eastern",
-  bars: closes.map(
-    (close, i): DailyBar => ({
-      date: `2026-07-${String(11 - i).padStart(2, "0")}`,
-      open: close,
-      high: close,
-      low: close,
-      close,
-      volume: 1_000_000,
-    })
-  ),
+  bars: closes.map((close, i): DailyBar => ({
+    date: `2026-07-${String(11 - i).padStart(2, "0")}`,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: 1_000_000,
+  })),
 });
 
 /**

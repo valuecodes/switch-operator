@@ -1,5 +1,6 @@
 import type { Logger } from "@repo/logger";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { TelegramService } from "./telegram";
 
 const mockFetch = vi.fn();

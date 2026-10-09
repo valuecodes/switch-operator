@@ -18,13 +18,13 @@ Guidelines for AI agents and contributors working in this Turborepo monorepo.
 
 ### Packages (`packages/`)
 
-| Name          | Filter                | Description                                  |
-| ------------- | --------------------- | -------------------------------------------- |
-| alpha-vantage | `@repo/alpha-vantage` | Alpha Vantage market data client             |
-| http-client   | `@repo/http-client`   | Fetch wrapper with Zod response validation   |
-| logger        | `@repo/logger`        | Structured JSON logger                       |
-| telegram      | `@repo/telegram`      | Telegram Bot API client                      |
-| url-validator | `@repo/url-validator` | Safety policy checks for user-supplied URLs  |
+| Name          | Filter                | Description                                 |
+| ------------- | --------------------- | ------------------------------------------- |
+| alpha-vantage | `@repo/alpha-vantage` | Alpha Vantage market data client            |
+| http-client   | `@repo/http-client`   | Fetch wrapper with Zod response validation  |
+| logger        | `@repo/logger`        | Structured JSON logger                      |
+| telegram      | `@repo/telegram`      | Telegram Bot API client                     |
+| url-validator | `@repo/url-validator` | Safety policy checks for user-supplied URLs |
 
 ### Tooling (`tooling/`)
 

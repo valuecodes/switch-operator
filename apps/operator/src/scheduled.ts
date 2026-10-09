@@ -1,5 +1,6 @@
 import { Logger } from "@repo/logger";
 import { TelegramService } from "@repo/telegram";
+import { validateSourceUrl } from "@repo/url-validator";
 
 import { OpenAiService } from "./services/openai";
 import { MAX_RETRIES, ScheduleService } from "./services/schedule";
@@ -16,7 +17,6 @@ import {
   TELEGRAM_HTML_SAFE_LENGTH,
   TELEGRAM_MAX_MESSAGE_LENGTH,
 } from "./utils/message";
-import { validateSourceUrl } from "@repo/url-validator";
 
 type Env = AppEnv["Bindings"];
 
