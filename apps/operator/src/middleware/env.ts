@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 
-import type { AppEnv } from "../types/env";
-import { envSchema } from "../types/env";
+import type { AppEnv } from "~/types/env";
+import { envSchema } from "~/types/env";
 
 const envValidatorMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const result = envSchema.safeParse(c.env);
@@ -11,7 +11,7 @@ const envValidatorMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     });
     return c.json({ error: "Server misconfiguration" }, 500);
   }
-  await next();
+  return next();
 });
 
 export { envValidatorMiddleware };

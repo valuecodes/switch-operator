@@ -101,7 +101,7 @@ describe("AlphaVantageClient", () => {
         high: 469.13,
         low: 464.45,
         close: 467.28,
-        volume: 92955850,
+        volume: 92_955_850,
       });
     });
 

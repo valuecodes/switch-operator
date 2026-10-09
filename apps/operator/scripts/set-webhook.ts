@@ -27,7 +27,7 @@ const main = async () => {
   const isProd = args.includes("--prod");
   const baseUrl = args.find((a) => !a.startsWith("--"));
 
-  if (!baseUrl) {
+  if (baseUrl === undefined || baseUrl === "") {
     console.error("Usage: pnpm set-webhook <base-url> [--prod]");
     console.error("Example: pnpm set-webhook https://xxx.trycloudflare.com");
     console.error(
@@ -49,10 +49,15 @@ const main = async () => {
     process.exit(1);
   }
 
-  const token = vars["TELEGRAM_BOT_TOKEN"];
-  const secret = vars["TELEGRAM_WEBHOOK_SECRET"];
+  const token = vars.TELEGRAM_BOT_TOKEN;
+  const secret = vars.TELEGRAM_WEBHOOK_SECRET;
 
-  if (!token || !secret) {
+  if (
+    token === undefined ||
+    token === "" ||
+    secret === undefined ||
+    secret === ""
+  ) {
     console.error(
       `Missing TELEGRAM_BOT_TOKEN or TELEGRAM_WEBHOOK_SECRET in ${varsFile}`
     );
@@ -92,13 +97,13 @@ const main = async () => {
       console.error("Webhook registration failed:", result.description);
       process.exit(1);
     }
-  } catch (err) {
-    if (err instanceof HttpClientError) {
-      console.error("Webhook registration failed:", err.message, err.body);
+  } catch (error) {
+    if (error instanceof HttpClientError) {
+      console.error("Webhook registration failed:", error.message, error.body);
       process.exit(1);
     }
-    throw err;
+    throw error;
   }
 };
 
-main();
+await main();

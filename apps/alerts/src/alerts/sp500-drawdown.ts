@@ -106,7 +106,7 @@ const sp500Drawdown: Alert = {
       const crossed = DRAWDOWN_LEVELS.filter(
         (l) => l.threshold > bandPrev && l.threshold <= bandToday
       );
-      const deepest = crossed[crossed.length - 1];
+      const deepest = crossed.at(-1);
       const deploySum = crossed.reduce((sum, l) => sum + l.deploy, 0);
       const action =
         deploySum > 0
@@ -124,7 +124,7 @@ const sp500Drawdown: Alert = {
       (l) => l.threshold > bandToday && l.threshold <= bandPrev
     );
     // Deepest level reclaimed (crossed is ascending by threshold).
-    const reclaimed = crossed[crossed.length - 1].threshold;
+    const reclaimed = crossed.at(-1).threshold;
     const refillSum = crossed.reduce((sum, l) => sum + l.deploy, 0);
     const action =
       refillSum > 0

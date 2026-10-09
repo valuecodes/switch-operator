@@ -1,12 +1,12 @@
 import type { MockInstance } from "vitest";
 
-import { Logger } from "../logger";
-import type { LogEntry } from "../types";
+import { Logger } from "./logger";
+import type { LogEntry } from "./types";
 
 type ConsoleSpy = MockInstance<(...args: unknown[]) => void>;
 
 const parseLogEntry = (spy: ConsoleSpy): LogEntry => {
-  const firstCall = spy.mock.calls[0] as unknown[] | undefined;
+  const firstCall = spy.mock.calls[0];
   expect(firstCall).toBeDefined();
   return JSON.parse(String(firstCall?.[0])) as LogEntry;
 };

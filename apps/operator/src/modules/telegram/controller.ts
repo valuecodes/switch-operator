@@ -2,17 +2,15 @@ import type { Logger } from "@repo/logger";
 import { TelegramService } from "@repo/telegram";
 import type { Context } from "hono";
 
-import { PendingActionService } from "../../services/pending-action";
-import type { PendingAction } from "../../services/pending-action";
-import { PendingConversationService } from "../../services/pending-conversation";
-import { ScheduleService } from "../../services/schedule";
-import type { CreateScheduleInput } from "../../services/schedule";
-import type { AppEnv } from "../../types/env";
-import type {
-  TelegramCallbackQuery,
-  TelegramUpdate,
-} from "../../types/telegram";
-import { splitMessage } from "../../utils/message";
+import { PendingActionService } from "~/services/pending-action";
+import type { PendingAction } from "~/services/pending-action";
+import { PendingConversationService } from "~/services/pending-conversation";
+import { ScheduleService } from "~/services/schedule";
+import type { CreateScheduleInput } from "~/services/schedule";
+import type { AppEnv } from "~/types/env";
+import type { TelegramCallbackQuery, TelegramUpdate } from "~/types/telegram";
+import { splitMessage } from "~/utils/message";
+
 import { parseCallbackData } from "./callback-data";
 import type { ParsedCallback } from "./callback-data";
 import { ConversationRunner } from "./conversation-runner";
@@ -28,6 +26,9 @@ const executePendingAction = async (
   if (action.type === "create_schedule") {
     const input = action.payload as unknown as CreateScheduleInput;
     const row = await scheduleService.create(chatId, input);
+    if (row === undefined) {
+      throw new Error("Schedule insert returned no row");
+    }
     logger.info("schedule created", { scheduleId: row.id });
     return `Schedule created: ${action.description}\nID: ${row.id}\nNext run: ${row.nextRunAt}`;
   }
@@ -74,7 +75,7 @@ const handleMessage = async (
     isAllowedChat,
   });
 
-  if (!message?.text) {
+  if (message?.text === undefined || message.text === "") {
     return c.json({ ok: true });
   }
 
@@ -206,17 +207,17 @@ const ackAndClearKeyboard = async (
 ): Promise<void> => {
   await telegram
     .answerCallbackQuery({ callback_query_id: cq.id, text: toast })
-    .catch((err: unknown) => {
+    .catch((error: unknown) => {
       logger.warn("answerCallbackQuery failed", {
-        error: err instanceof Error ? err.message : String(err),
+        error: error instanceof Error ? error.message : String(error),
       });
     });
   if (messageId !== undefined) {
     await telegram
       .editMessageReplyMarkup({ chat_id: chatId, message_id: messageId })
-      .catch((err: unknown) => {
+      .catch((error: unknown) => {
         logger.warn("editMessageReplyMarkup failed", {
-          error: err instanceof Error ? err.message : String(err),
+          error: error instanceof Error ? error.message : String(error),
         });
       });
   }
@@ -262,7 +263,7 @@ const handleConfirmOrCancel = async (
     await ackAndClearKeyboard(cq, chatId, messageId, telegram, logger, toast);
   }
 
-  if (resultMessage) {
+  if (resultMessage !== undefined && resultMessage !== "") {
     for (const chunk of splitMessage(resultMessage)) {
       await telegram.sendMessage({ chat_id: chatId, text: chunk });
     }
@@ -354,9 +355,14 @@ const handleAnswerCallback = async (
     "Recorded"
   );
 
-  const chosen = consumed.options[parsed.optionIndex];
   const runner = new ConversationRunner(chatId, c.env, logger, telegram);
   try {
+    const chosen = consumed.options[parsed.optionIndex];
+    if (chosen === undefined) {
+      throw new Error(
+        `Option index ${String(parsed.optionIndex)} out of range for consumed conversation`
+      );
+    }
     await runner.resumeFromAnswer(
       consumed.messages as Parameters<typeof runner.resumeFromAnswer>[0],
       consumed.pendingToolCallId,

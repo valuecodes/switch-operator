@@ -19,9 +19,5 @@ type AppEnv = {
   };
 };
 
-const parseEnv = (env: unknown): z.infer<typeof envSchema> => {
-  return envSchema.parse(env);
-};
-
-export { envSchema, parseEnv };
+export { envSchema };
 export type { AppEnv };

@@ -2,28 +2,29 @@ import type { Logger } from "@repo/logger";
 import type { TelegramService } from "@repo/telegram";
 import { validateSourceUrl } from "@repo/url-validator";
 
-import { buildInitialMessages, OpenAiService } from "../../services/openai";
+import { buildInitialMessages, OpenAiService } from "~/services/openai";
 import type {
   ToolExecutor,
   ToolLoopMessages,
   ToolLoopOutcome,
   ToolResult,
-} from "../../services/openai";
-import { PendingActionService } from "../../services/pending-action";
-import { PendingConversationService } from "../../services/pending-conversation";
-import type { QuestionOption } from "../../services/pending-conversation";
+} from "~/services/openai";
+import { PendingActionService } from "~/services/pending-action";
+import { PendingConversationService } from "~/services/pending-conversation";
+import type { QuestionOption } from "~/services/pending-conversation";
 import {
   createScheduleSchema,
   MAX_ACTIVE_SCHEDULES,
   ScheduleService,
-} from "../../services/schedule";
-import type { AppEnv } from "../../types/env";
-import { markdownToTelegramHtml } from "../../utils/markdown-to-html";
+} from "~/services/schedule";
+import type { AppEnv } from "~/types/env";
+import { markdownToTelegramHtml } from "~/utils/markdown-to-html";
 import {
   splitMessage,
   TELEGRAM_HTML_SAFE_LENGTH,
   TELEGRAM_MAX_MESSAGE_LENGTH,
-} from "../../utils/message";
+} from "~/utils/message";
+
 import {
   buildConfirmationKeyboard,
   buildQuestionKeyboard,
@@ -148,7 +149,7 @@ class ConversationRunner {
           return { error: validation.error.message };
         }
 
-        if (input.sourceUrl) {
+        if (input.sourceUrl !== undefined && input.sourceUrl !== "") {
           const urlCheck = validateSourceUrl(input.sourceUrl);
           if (!urlCheck.valid) {
             return { error: urlCheck.reason };
@@ -157,7 +158,7 @@ class ConversationRunner {
 
         this.pendingButtonToken = await this.pendingActions.set(this.chatId, {
           type: "create_schedule",
-          payload: input as unknown as Record<string, unknown>,
+          payload: input,
           description: formatScheduleDescription("create", args),
         });
 
@@ -168,14 +169,14 @@ class ConversationRunner {
 
       if (name === "delete_schedule") {
         const id = args.id as string | undefined;
-        if (!id) {
+        if (id === undefined || id === "") {
           return { error: "Missing schedule ID" };
         }
         const summary =
           typeof args.summary === "string" && args.summary.trim().length > 0
             ? args.summary.trim()
             : undefined;
-        if (!summary) {
+        if (summary === undefined) {
           return {
             error:
               "Missing summary. Pass a human-readable summary built from the matching list_schedules entry (type, time, description) so the user can recognize what's being deleted.",
@@ -213,11 +214,11 @@ class ConversationRunner {
         const chunks = [
           ...splitMessage(outcome.question, TELEGRAM_MAX_MESSAGE_LENGTH),
         ];
-        for (let i = 0; i < chunks.length; i++) {
+        for (const [i, chunk] of chunks.entries()) {
           const isLast = i === chunks.length - 1;
           await this.telegram.sendMessage({
             chat_id: this.chatId,
-            text: chunks[i],
+            text: chunk,
             ...(isLast ? { reply_markup: replyMarkup } : {}),
           });
         }
@@ -228,17 +229,18 @@ class ConversationRunner {
       return;
     }
 
-    const replyMarkup = this.pendingButtonToken
-      ? buildConfirmationKeyboard(this.pendingButtonToken)
-      : undefined;
+    const replyMarkup =
+      this.pendingButtonToken !== undefined && this.pendingButtonToken !== ""
+        ? buildConfirmationKeyboard(this.pendingButtonToken)
+        : undefined;
     const chunks = [
       ...splitMessage(outcome.content, TELEGRAM_HTML_SAFE_LENGTH),
     ];
-    for (let i = 0; i < chunks.length; i++) {
+    for (const [i, chunk] of chunks.entries()) {
       const isLast = i === chunks.length - 1;
       await this.telegram.sendMessage({
         chat_id: this.chatId,
-        text: markdownToTelegramHtml(chunks[i]),
+        text: markdownToTelegramHtml(chunk),
         parse_mode: "HTML" as const,
         ...(isLast && replyMarkup ? { reply_markup: replyMarkup } : {}),
       });

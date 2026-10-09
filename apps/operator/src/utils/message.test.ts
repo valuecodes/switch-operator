@@ -33,7 +33,7 @@ describe("splitMessage", () => {
     expect(chunks.length).toBeGreaterThan(1);
     for (const chunk of chunks) {
       expect(chunk.endsWith("a")).toBe(true);
-      expect(chunk.includes("\n\n")).toBe(false);
+      expect(chunk).not.toContain("\n\n");
     }
     expect(chunks.join("\n")).toBe(text);
   });

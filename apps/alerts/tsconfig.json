@@ -1,7 +1,10 @@
 {
   "extends": "@repo/typescript/base.json",
   "compilerOptions": {
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types"],
+    "paths": {
+      "~/*": ["./src/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules"]

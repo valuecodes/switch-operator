@@ -40,12 +40,8 @@ const telegramUpdateSchema = z
   })
   .loose();
 
-export {
-  telegramCallbackQuerySchema,
-  telegramMessageSchema,
-  telegramUpdateSchema,
-};
+type TelegramUpdate = z.infer<typeof telegramUpdateSchema>;
+type TelegramCallbackQuery = z.infer<typeof telegramCallbackQuerySchema>;
 
-export type TelegramUpdate = z.infer<typeof telegramUpdateSchema>;
-export type TelegramMessage = z.infer<typeof telegramMessageSchema>;
-export type TelegramCallbackQuery = z.infer<typeof telegramCallbackQuerySchema>;
+export { telegramUpdateSchema };
+export type { TelegramCallbackQuery, TelegramUpdate };

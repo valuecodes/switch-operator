@@ -8,9 +8,7 @@ const envSchema = z.object({
 
 type Env = z.infer<typeof envSchema>;
 
-const parseEnv = (env: unknown): Env => {
-  return envSchema.parse(env);
-};
+const parseEnv = (env: unknown): Env => envSchema.parse(env);
 
 export { envSchema, parseEnv };
 export type { Env };

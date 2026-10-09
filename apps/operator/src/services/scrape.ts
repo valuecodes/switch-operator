@@ -93,8 +93,8 @@ const readBodyWithLimit = async (
 
 const collapseWhitespace = (text: string): string =>
   text
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
+    .replaceAll(/\n{3,}/g, "\n\n")
+    .replaceAll(/[ \t]{2,}/g, " ")
     .trim();
 
 const convertContent = (
@@ -148,7 +148,7 @@ const fetchWithSafeRedirects = async (
     }
 
     const location = response.headers.get("location");
-    if (!location) {
+    if (location === null || location === "") {
       return response;
     }
 
@@ -278,14 +278,4 @@ const scrapeUrl = async (
   };
 };
 
-export {
-  collapseWhitespace,
-  convertContent,
-  DEFAULT_MAX_TEXT_LENGTH,
-  FETCH_TIMEOUT_MS,
-  MAX_BODY_BYTES,
-  MAX_REDIRECTS,
-  scrapeUrl,
-  USER_AGENT,
-};
-export type { ScrapeOptions, ScrapeResult };
+export { collapseWhitespace, convertContent, scrapeUrl };

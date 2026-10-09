@@ -1,7 +1,7 @@
 import type { InlineKeyboardMarkup } from "@repo/telegram/types";
 
-import type { QuestionOption } from "../../services/pending-conversation";
-import type { CreateScheduleInput } from "../../services/schedule";
+import type { QuestionOption } from "~/services/pending-conversation";
+import type { CreateScheduleInput } from "~/services/schedule";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const QUESTION_BUTTON_LABEL_MAX = 32;
@@ -13,7 +13,7 @@ const formatScheduleDescription = (
   const schedType =
     typeof args.schedule_type === "string" ? args.schedule_type : type;
   const parts: string[] = [`${schedType} schedule`];
-  if (args.hour != null) {
+  if (args.hour !== null && args.hour !== undefined) {
     const h = typeof args.hour === "number" ? String(args.hour) : "0";
     const m =
       typeof args.minute === "number"

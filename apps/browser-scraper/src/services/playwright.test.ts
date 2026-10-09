@@ -85,9 +85,10 @@ describe("PlaywrightService.render", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatch(/Unsafe final URL/);
+    if (result.ok) {
+      throw new Error("expected render to fail");
     }
+    expect(result.error).toMatch(/Unsafe final URL/);
     expect(closeMock).toHaveBeenCalledOnce();
   });
 

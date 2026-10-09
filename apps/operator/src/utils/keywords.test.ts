@@ -86,24 +86,24 @@ describe("extractWindows", () => {
   });
 
   it("extracts window around single match", () => {
-    const text = "a".repeat(100) + "MATCH" + "b".repeat(100);
+    const text = `${"a".repeat(100)}MATCH${"b".repeat(100)}`;
     const result = extractWindows(text, [100], 10);
-    expect(result).toBe("a".repeat(10) + "MATCH" + "b".repeat(5));
-    expect(result.length).toBe(20);
+    expect(result).toBe(`${"a".repeat(10)}MATCH${"b".repeat(5)}`);
+    expect(result).toHaveLength(20);
   });
 
   it("clamps to text start", () => {
-    const text = "MATCH" + "x".repeat(100);
+    const text = `MATCH${"x".repeat(100)}`;
     const result = extractWindows(text, [0], 10);
     expect(result.startsWith("MATCH")).toBe(true);
-    expect(result.length).toBe(10);
+    expect(result).toHaveLength(10);
   });
 
   it("clamps to text end", () => {
-    const text = "x".repeat(100) + "MATCH";
+    const text = `${"x".repeat(100)}MATCH`;
     const result = extractWindows(text, [100], 10);
     expect(result.endsWith("MATCH")).toBe(true);
-    expect(result.length).toBe(15);
+    expect(result).toHaveLength(15);
   });
 
   it("merges overlapping windows", () => {
@@ -112,13 +112,13 @@ describe("extractWindows", () => {
     const result = extractWindows(text, [20, 25], 10);
     // Should be one merged window from [10, 35]
     expect(result).toBe("x".repeat(25));
-    expect(result.includes("---")).toBe(false);
+    expect(result).not.toContain("---");
   });
 
   it("separates non-overlapping windows", () => {
     const text = "x".repeat(200);
     // Two positions far apart
     const result = extractWindows(text, [10, 190], 5);
-    expect(result.includes("\n\n---\n\n")).toBe(true);
+    expect(result).toContain("\n\n---\n\n");
   });
 });

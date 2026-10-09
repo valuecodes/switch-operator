@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 
-import type { AppEnv } from "../types/env";
+import type { AppEnv } from "~/types/env";
 
 /**
  * Official Telegram IPv4 CIDR ranges.
@@ -26,23 +26,23 @@ type CidrEntry = {
   mask: number;
 };
 
+// Missing octets count as 0, matching how bitwise ops coerce undefined/NaN.
+const ipToNumber = (ip: string): number => {
+  const [a = 0, b = 0, c = 0, d = 0] = ip.split(".").map(Number);
+  return ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
+};
+
 const parseCidr = (cidr: string): CidrEntry => {
   const [ip, prefix] = cidr.split("/");
-  const parts = ip.split(".").map(Number);
-  const network =
-    ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+  if (ip === undefined || prefix === undefined) {
+    throw new Error(`Malformed CIDR: ${cidr}`);
+  }
+  const network = ipToNumber(ip);
   const mask = (~0 << (32 - Number(prefix))) >>> 0;
   return { network, mask };
 };
 
 const parsedCidrs = TELEGRAM_CIDRS.map(parseCidr);
-
-const ipToNumber = (ip: string): number => {
-  const parts = ip.split(".").map(Number);
-  return (
-    ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
-  );
-};
 
 const isInTelegramRange = (ip: string): boolean => {
   const ipNum = ipToNumber(ip);
@@ -59,13 +59,13 @@ export const telegramIpMiddleware = createMiddleware<AppEnv>(
   async (c, next) => {
     const ip = c.req.header("cf-connecting-ip");
 
-    if (!ip || !isInTelegramRange(ip)) {
+    if (ip === undefined || ip === "" || !isInTelegramRange(ip)) {
       c.get("logger").warn("rejected request from non-Telegram IP", {
         ip: ip ?? "unknown",
       });
       return c.json({ error: "Forbidden" }, 403);
     }
 
-    await next();
+    return next();
   }
 );

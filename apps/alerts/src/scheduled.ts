@@ -60,10 +60,9 @@ const handleScheduled = async (
   });
 };
 
-const createScheduledHandler = () => {
-  return (event: ScheduledEvent, env: unknown, ctx: ExecutionContext) => {
+const createScheduledHandler =
+  () => (event: ScheduledEvent, env: unknown, ctx: ExecutionContext) => {
     ctx.waitUntil(handleScheduled(event, env, ctx));
   };
-};
 
 export { createScheduledHandler, handleScheduled };

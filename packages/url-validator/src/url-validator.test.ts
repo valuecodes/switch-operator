@@ -52,7 +52,7 @@ describe("validateSourceUrl", () => {
   });
 
   it("rejects URLs over 2048 chars", () => {
-    const result = validateSourceUrl("https://example.com/" + "a".repeat(2048));
+    const result = validateSourceUrl(`https://example.com/${"a".repeat(2048)}`);
     expect(result).toEqual({
       valid: false,
       reason: "URL exceeds 2048 character limit",

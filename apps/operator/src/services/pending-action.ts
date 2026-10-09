@@ -2,7 +2,7 @@ import { and, eq, gt, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 
-import { pendingActions } from "../db/schema";
+import { pendingActions } from "~/db/schema";
 
 type PendingActionType = "create_schedule" | "delete_schedule";
 
@@ -22,8 +22,8 @@ const generateToken = (): string => {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
     .replace(/=+$/, "");
 };
 
@@ -96,10 +96,11 @@ class PendingActionService {
         )
       )
       .returning();
-    if (deleted.length === 0) {
+    const [row] = deleted;
+    if (row === undefined) {
       return undefined;
     }
-    return rowToAction(deleted[0]);
+    return rowToAction(row);
   }
 
   /**
@@ -118,10 +119,11 @@ class PendingActionService {
         )
       )
       .returning();
-    if (deleted.length === 0) {
+    const [row] = deleted;
+    if (row === undefined) {
       return undefined;
     }
-    return rowToAction(deleted[0]);
+    return rowToAction(row);
   }
 
   async clear(chatId: number): Promise<void> {
@@ -138,5 +140,5 @@ class PendingActionService {
   }
 }
 
-export { generateToken, PendingActionService, TTL_MS };
-export type { PendingAction, PendingActionType };
+export { generateToken, PendingActionService };
+export type { PendingAction };

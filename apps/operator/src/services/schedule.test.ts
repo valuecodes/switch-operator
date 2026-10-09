@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { computeNextRun, createScheduleSchema } from "./schedule";
+import { createScheduleSchema } from "./schedule";
+import { computeNextRun } from "./schedule-time";
 
 describe("computeNextRun", () => {
   describe("hourly", () => {
@@ -346,7 +347,7 @@ describe("createScheduleSchema", () => {
   it("rejects sourceUrl over 2048 chars", () => {
     const result = createScheduleSchema.safeParse({
       ...base,
-      sourceUrl: "https://example.com/" + "x".repeat(2048),
+      sourceUrl: `https://example.com/${"x".repeat(2048)}`,
       messagePrompt: "test",
     });
     expect(result.success).toBe(false);
@@ -360,9 +361,7 @@ describe("createScheduleSchema", () => {
       useBrowser: true,
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.useBrowser).toBe(true);
-    }
+    expect(result.data?.useBrowser).toBe(true);
   });
 
   it("accepts useBrowser=false explicitly", () => {
@@ -373,9 +372,7 @@ describe("createScheduleSchema", () => {
       useBrowser: false,
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.useBrowser).toBe(false);
-    }
+    expect(result.data?.useBrowser).toBe(false);
   });
 
   it("leaves useBrowser undefined when omitted", () => {
@@ -385,9 +382,7 @@ describe("createScheduleSchema", () => {
       messagePrompt: "Summarize changes",
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.useBrowser).toBeUndefined();
-    }
+    expect(result.data?.useBrowser).toBeUndefined();
   });
 
   it("rejects useBrowser of non-boolean type", () => {

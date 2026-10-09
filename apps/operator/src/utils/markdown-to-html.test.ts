@@ -225,8 +225,7 @@ describe("markdownToTelegramHtml — splitMessage + convert pipeline", () => {
   });
 
   it("produces balanced HTML when split lands inside a fenced code block", () => {
-    const codeFence =
-      "```\n" + "code line\n".repeat(500) + "```\n\nFollow-up text.";
+    const codeFence = `\`\`\`\n${"code line\n".repeat(500)}\`\`\`\n\nFollow-up text.`;
     expect(codeFence.length).toBeGreaterThan(4096);
 
     const chunks = splitMessage(codeFence);
@@ -240,13 +239,10 @@ describe("markdownToTelegramHtml — splitMessage + convert pipeline", () => {
 
 const countSubstr = (haystack: string, needle: string): number => {
   let n = 0;
-  let from = 0;
-  while (true) {
-    const idx = haystack.indexOf(needle, from);
-    if (idx === -1) {
-      return n;
-    }
+  let idx = haystack.indexOf(needle);
+  while (idx !== -1) {
     n++;
-    from = idx + needle.length;
+    idx = haystack.indexOf(needle, idx + needle.length);
   }
+  return n;
 };
