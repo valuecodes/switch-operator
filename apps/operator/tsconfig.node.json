@@ -1,0 +1,7 @@
+{
+  // The Vitest and drizzle-kit configs run in Node, not the Workers runtime, so
+  // they get the node preset and are checked separately from `src/`. oxlint's
+  // type-aware rules also resolve them through this file.
+  "extends": "@repo/typescript/node.json",
+  "include": ["*.config.ts"]
+}

@@ -26,8 +26,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
+      # zizmor prefers the `$/` self-repository syntax, but actionlint 1.7.12
+      # rejects it; switch once actionlint accepts `$/`.
       - name: Setup
-        uses: ./tooling/github/setup
+        uses: ./.github/actions/setup # zizmor: ignore[self-repository]
 
       - name: Apply D1 migrations
         run: pnpm --filter @repo/operator exec wrangler d1 migrations apply switch-operator-db --remote

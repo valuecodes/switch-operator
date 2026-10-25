@@ -1,27 +1,42 @@
 packages:
   - "apps/*"
   - "packages/*"
-  - "tooling/*"
 
-# Versions used by more than one package, referenced as `catalog:`. Bump with
-# `pnpm up --latest -r <pkg>`, which rewrites only this file.
+# Every external dependency version, referenced as `catalog:` from the
+# manifests. Update everything with `pnpm up --latest -r`, which rewrites only
+# this file and the lockfile.
 #
-# Not here: `@repo/*` deps (stay `workspace:*`) and single-consumer deps (pinned
-# inline in that manifest). Scoped keys must be double-quoted.
+# Not here: `@repo/*` deps (stay `workspace:*`). Scoped keys must be
+# double-quoted.
 catalog:
+  "@cloudflare/playwright": 1.3.6
+  # At least the version `wrangler` declares as its peer.
+  "@cloudflare/workers-types": 5.20261010.1
+  "@hono/zod-validator": 0.9.1
+  # Held on the Node 24 line to match `.nvmrc` (see `updateConfig` below).
+  "@types/node": 24.19.2
+  drizzle-kit: 0.31.11
+  drizzle-orm: 0.45.3
+  hono: 4.13.9
+  knip: 6.41.0
+  node-html-markdown: 2.0.0
+  openai: 7.23.0
+  oxfmt: 0.72.0
+  oxlint: 1.87.0
+  oxlint-tsgolint: 7.0.2003
+  tsx: 4.23.15
+  turbo: 2.11.7
   # `typescript` is the native (Go) compiler; its binary is still `tsc`.
-  "@types/node": 24.13.6
-  prettier: 3.9.9
   typescript: 7.0.2
-  vitest: 5.0.1
-
-  # Loaded by the root manifest and tooling/prettier.
-  "@ianvs/prettier-plugin-sort-imports": 4.7.1
-
-  # Shared by the Cloudflare Workers apps and packages.
-  "@cloudflare/workers-types": 5.20260925.1
-  wrangler: 4.140.0
+  vitest: 5.0.3
+  wrangler: 4.149.0
   zod: 4.6.5
+
+# Skipped by `pnpm up --latest`. `@types/node` must track the Node major in
+# `.nvmrc`, so bump it by hand within that line.
+updateConfig:
+  ignoreDependencies:
+    - "@types/node"
 
 # Makes `pnpm add` / `pnpm update` use the catalog and reject conflicting
 # versions. Plain `pnpm install` never evaluates it, so it is an authoring
