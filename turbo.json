@@ -9,7 +9,15 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
-    "test": {},
+    // No script runs for `transit`; it only chains through the workspace
+    // dependencies, so tests stay parallel but a change in a dependency
+    // package still invalidates the cached test result.
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "test": {
+      "dependsOn": ["transit"]
+    },
     "clean": {
       "cache": false
     },
