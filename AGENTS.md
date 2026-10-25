@@ -18,21 +18,17 @@ Guidelines for AI agents and contributors working in this Turborepo monorepo.
 
 ### Packages (`packages/`)
 
-| Name          | Filter                | Description                                 |
-| ------------- | --------------------- | ------------------------------------------- |
-| alpha-vantage | `@repo/alpha-vantage` | Alpha Vantage market data client            |
-| http-client   | `@repo/http-client`   | Fetch wrapper with Zod response validation  |
-| logger        | `@repo/logger`        | Structured JSON logger                      |
-| telegram      | `@repo/telegram`      | Telegram Bot API client                     |
-| url-validator | `@repo/url-validator` | Safety policy checks for user-supplied URLs |
+| Name          | Filter                | Description                                       |
+| ------------- | --------------------- | ------------------------------------------------- |
+| alpha-vantage | `@repo/alpha-vantage` | Alpha Vantage market data client                  |
+| http-client   | `@repo/http-client`   | Fetch wrapper with Zod response validation        |
+| logger        | `@repo/logger`        | Structured JSON logger                            |
+| telegram      | `@repo/telegram`      | Telegram Bot API client                           |
+| typescript    | `@repo/typescript`    | Shared tsconfig presets (`base`, `node`, `react`) |
+| url-validator | `@repo/url-validator` | Safety policy checks for user-supplied URLs       |
 
-### Tooling (`tooling/`)
-
-| Name       | Filter             | Description                                                      |
-| ---------- | ------------------ | ---------------------------------------------------------------- |
-| prettier   | `@repo/prettier`   | Shared Prettier config                                           |
-| typescript | `@repo/typescript` | Shared tsconfig presets (`base.json`, `node.json`, `react.json`) |
-| github     | `@repo/github`     | GitHub Actions composite setup action, gitleaks `secrets-scan`   |
+CI helpers are not workspaces: the composite setup action lives in
+`.github/actions/setup/` and the gitleaks script in `.github/scripts/`.
 
 Apps may import packages; packages must never import apps. oxlint bans `../`
 imports and deep `@repo/*/src` imports: import other workspaces by package name,
@@ -42,7 +38,7 @@ and inside an app use the `~/` alias (`src/*`) to go up the tree.
 
 ## Commands
 
-**Prerequisites:** Node.js 24.21.0 (`.nvmrc`), pnpm 12.6.0 (`packageManager` in root `package.json`).
+**Prerequisites:** Node.js 24 (exact version in `.nvmrc`), pnpm 12.11.2 (`packageManager` in root `package.json`).
 
 ```bash
 pnpm install                     # Install all dependencies
@@ -53,8 +49,8 @@ pnpm knip                        # unused files, exports and dependencies
 pnpm typecheck                   # turbo run typecheck
 pnpm test                        # turbo run test
 pnpm build                       # turbo run build
-pnpm format                      # prettier --write .
-pnpm format:check                # prettier --check . (no writes)
+pnpm format                      # oxfmt, writes in place
+pnpm format:check                # oxfmt --check (no writes)
 pnpm secrets:scan                # gitleaks over the full git history
 pnpm clean                       # turbo run clean
 
@@ -64,18 +60,45 @@ pnpm --filter @repo/operator set-webhook <url> [-- --prod]
 `lint` and `knip` do not go through Turbo — each is a single process over the whole
 repo. oxlint is configured by the root `.oxlintrc.json` (including `import/no-cycle`)
 and prints nothing when there are no findings, so silent output means clean. Knip is
-configured by the root `knip.jsonc` and exits 0 when clean.
+configured by the root `knip.jsonc` and exits 0 when clean. Formatting is oxfmt
+(Prettier-compatible), configured by the root `.oxfmtrc.jsonc`, which also sorts
+imports.
 
 There is no post-edit formatting hook: run `pnpm format` yourself before committing.
 
-`secrets:scan` runs gitleaks (`tooling/github/scripts/secrets-scan.sh`, version pinned
+`secrets:scan` runs gitleaks (`.github/scripts/secrets-scan.sh`, version pinned
 there) using a local `gitleaks` v8.19+ if one is on PATH, otherwise the pinned Docker image.
 It exits 0 when clean and 1 when it finds a leak.
 
-CI (`.github/workflows/`) runs typecheck, lint, knip, format-check, test, secrets-scan
-and CodeQL code scanning (`javascript-typescript` and `actions`) on push to `main` and
-on PRs. On `main`, the workers deploy to Cloudflare once those checks pass, and D1
-migrations apply when `apps/operator/migrations/**` changes.
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, knip, format:check, test,
+secrets-scan, CodeQL code scanning (`javascript-typescript`) and workflow-lint on PRs and
+on push to `main`. workflow-lint calls the reusable workflow from `valuecodes/automation`:
+actionlint (with shellcheck) and zizmor over the workflow and action files. Each tool
+reads `.github/actionlint.yaml` / `zizmor.yml` if added. `all-passed` fans those in
+and is the one check to require in branch protection. The typecheck and test jobs
+restore Turbo's `.turbo` cache from the previous run of the same task, so unchanged
+packages replay instead of rerunning.
+
+On push to `main`, the `deploy` job in `ci.yml` deploys the three workers to Cloudflare
+once `all-passed` succeeds, through the `production` environment. D1 migrations are a
+separate workflow (`migrations.yml`): it runs on push to `main` when
+`apps/operator/migrations/**` changes and does not wait for CI or the deploy.
+
+Dependabot (`.github/dependabot.yml`) bumps the SHA-pinned actions and reusable workflows
+monthly in one grouped PR; npm dependencies are updated by hand.
+
+`maintenance-dashboard.yml` calls the maintenance dashboard workflow from
+`valuecodes/automation` daily.
+It keeps one issue, **Maintenance dashboard** (label `maintenance-dashboard`), listing
+what is due: `catalog:` updates, pnpm (`packageManager`), gitleaks (`GITLEAKS_VERSION`
+in the secrets-scan script), Node.js (`.nvmrc`) and `pnpm audit` findings. Like
+`minimumReleaseAge`, a release shows up only once it is 14 days old; a Node.js security
+release shows up right away and is flagged. It never opens PRs or commits; doing the
+updates stays manual. For a Node.js bump, change only `.nvmrc` (the one place that
+holds the exact version). If `GITLEAKS_VERSION` moves out of
+`.github/scripts/secrets-scan.sh`, pass the new path as the `gitleaks-script` input.
+The dashboard and workflow-lint callers pin the same `valuecodes/automation` commit, so
+bump them together.
 
 ---
 
@@ -84,8 +107,10 @@ migrations apply when `apps/operator/migrations/**` changes.
 - Keep diffs tight and focused; no drive-by refactors or new tooling without discussion.
 - Never commit secrets, credentials, `.env`, `.dev.vars` or `.prod.vars` files.
 - Add dependencies to the correct workspace with `pnpm --filter <package> add <dep>`.
-  Versions shared by more than one package go in the `catalog:` block of
-  `pnpm-workspace.yaml`; single-consumer deps are pinned inline.
+  Every external version lives in the `catalog:` block of `pnpm-workspace.yaml`
+  and manifests reference it as `catalog:`; `@repo/*` deps stay `workspace:*`.
+  Update with `pnpm up --latest -r`; `updateConfig.ignoreDependencies` holds
+  `@types/node` to the `.nvmrc` major, so bump it by hand.
 - Every install enforces the supply-chain settings in `pnpm-workspace.yaml`
   (`minimumReleaseAge`, `trustPolicy: no-downgrade`) plus pnpm 12's default
   `blockExoticSubdeps`. When one fails, investigate: never disable it, and never

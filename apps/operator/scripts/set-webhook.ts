@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { HttpClient, HttpClientError } from "@repo/http-client";
 import { Logger } from "@repo/logger";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { z } from "zod";
 
 const parseVarsFile = (path: string): Record<string, string> => {

@@ -1,0 +1,7 @@
+{
+  // The Vitest config runs in Node, not the Workers runtime, so it gets the
+  // node preset and is checked separately from `src/`. oxlint's type-aware
+  // rules also resolve it through this file.
+  "extends": "@repo/typescript/node.json",
+  "include": ["*.config.ts"]
+}

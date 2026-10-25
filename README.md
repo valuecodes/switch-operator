@@ -21,7 +21,7 @@ The current feature set includes:
 - **LLM:** OpenAI API
 - **Validation:** Zod
 - **Monorepo:** pnpm workspaces + Turborepo
-- **Tooling:** oxlint (type-aware), Prettier, Knip
+- **Tooling:** oxlint (type-aware), oxfmt, Knip
 
 ## Structure
 
@@ -35,11 +35,11 @@ packages/
   http-client/      # Shared fetch wrapper with response validation
   logger/           # Shared structured logger
   telegram/         # Telegram Bot API client
-  url-validator/    # Safety policy checks for user-supplied URLs
-tooling/
-  github/           # CI setup action and gitleaks secrets scan
-  prettier/         # Shared Prettier config
   typescript/       # Shared TypeScript config
+  url-validator/    # Safety policy checks for user-supplied URLs
+.github/            # CI workflow, composite setup action, secrets-scan script
+.oxlintrc.json      # Single root lint config
+.oxfmtrc.jsonc      # Single root format config
 ```
 
 ## Flow
@@ -63,7 +63,7 @@ flowchart TD
 
 ## Development
 
-Requires Node 24.21.0 (see `.nvmrc`) and pnpm 12 (see `packageManager`).
+Requires Node 24 (exact version in `.nvmrc`) and pnpm 12 (see `packageManager`).
 
 ```sh
 pnpm install          # install dependencies
@@ -83,3 +83,21 @@ For local Telegram bot testing you also need
 to tunnel to your local worker. See
 [apps/operator/README.md](apps/operator/README.md) for full setup instructions
 (`.dev.vars`, D1 migrations, webhook registration, production secrets).
+
+## CI and repo settings
+
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, knip, format:check, test, a
+gitleaks secret scan, CodeQL and actionlint + zizmor over the workflow files on PRs and
+on push to `main`. The `all-passed` job fans them in; on `main` the `deploy` job then
+deploys the workers. GitHub settings this relies on:
+
+1. **Rules → Rulesets**: the `main` ruleset requires a pull request and the
+   `all-passed` status check, the only one to list.
+2. **Environments → production**: a deployment-branch rule allowing `main` only, with
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets.
+3. **Code security → Code scanning**: _default setup_ **off**, or GitHub rejects the
+   CodeQL uploads from `ci.yml`.
+4. **Code security → Dependabot**: **alerts** on, **security updates** off.
+   `.github/dependabot.yml` only bumps the SHA-pinned GitHub Actions monthly.
+5. **Issues**: run the `Maintenance dashboard` workflow once, then pin the
+   **Maintenance dashboard** issue it creates.

@@ -184,7 +184,8 @@ describe("POST /webhook/telegram — callback_query", () => {
       // The OpenAI call should have received messages with a tool result that
       // carries the raw boolean (NOT a string).
       const openaiCall = openaiCreateMock.mock.calls.at(-1) as
-        [{ messages: { role: string; content?: string }[] }] | undefined;
+        | [{ messages: { role: string; content?: string }[] }]
+        | undefined;
       expect(openaiCall).toBeDefined();
       if (!openaiCall) {
         return;

@@ -63,4 +63,4 @@ pnpm --filter @repo/alerts exec wrangler secret put ALLOWED_CHAT_ID
 pnpm --filter @repo/alerts exec wrangler secret put ALPHA_VANTAGE_API_KEY
 ```
 
-Deploys run automatically on push to `main` (see `.github/workflows/main.yml`).
+Deploys run automatically on push to `main` (the `deploy` job in `.github/workflows/ci.yml`).

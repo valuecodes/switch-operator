@@ -17,10 +17,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@repo/prettier": "workspace:*",
     "@repo/typescript": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "prettier": "@repo/prettier"
+  }
 }

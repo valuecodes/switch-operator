@@ -12,10 +12,8 @@
     "clean": "rm -rf .turbo node_modules .cache"
   },
   "devDependencies": {
-    "@repo/prettier": "workspace:*",
     "@repo/typescript": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "prettier": "@repo/prettier"
+  }
 }
