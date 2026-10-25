@@ -86,17 +86,18 @@ to tunnel to your local worker. See
 
 ## CI and repo settings
 
-CI (`.github/workflows/ci.yml`) runs typecheck, lint, knip, format:check, test, a
-gitleaks secret scan, CodeQL and actionlint + zizmor over the workflow files on PRs and
-on push to `main`. The `all-passed` job fans them in; on `main` the `deploy` job then
-deploys the workers. GitHub settings this relies on:
+The checks live in `.github/workflows/checks.yml`: typecheck, lint, knip, format:check,
+test, a gitleaks secret scan, CodeQL and actionlint + zizmor over the workflow files.
+`feature.yml` runs them on PRs and fans them into `all-passed`; `main.yml` runs them on
+push to `main`, then the `deploy` job deploys the workers. GitHub settings this relies
+on:
 
 1. **Rules → Rulesets**: the `main` ruleset requires a pull request and the
    `all-passed` status check, the only one to list.
 2. **Environments → production**: a deployment-branch rule allowing `main` only, with
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as environment secrets.
 3. **Code security → Code scanning**: _default setup_ **off**, or GitHub rejects the
-   CodeQL uploads from `ci.yml`.
+   CodeQL uploads from `checks.yml`.
 4. **Code security → Dependabot**: **alerts** on, **security updates** off.
    `.github/dependabot.yml` only bumps the SHA-pinned GitHub Actions monthly.
 5. **Issues**: run the `Maintenance dashboard` workflow once, then pin the
