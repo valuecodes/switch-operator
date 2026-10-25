@@ -70,18 +70,20 @@ There is no post-edit formatting hook: run `pnpm format` yourself before committ
 there) using a local `gitleaks` v8.19+ if one is on PATH, otherwise the pinned Docker image.
 It exits 0 when clean and 1 when it finds a leak.
 
-CI (`.github/workflows/ci.yml`) runs typecheck, lint, knip, format:check, test,
-secrets-scan, CodeQL code scanning (`javascript-typescript`) and workflow-lint on PRs and
-on push to `main`. workflow-lint calls the reusable workflow from `valuecodes/automation`:
-actionlint (with shellcheck) and zizmor over the workflow and action files. Each tool
-reads `.github/actionlint.yaml` / `zizmor.yml` if added. `all-passed` fans those in
-and is the one check to require in branch protection. The typecheck and test jobs
-restore Turbo's `.turbo` cache from the previous run of the same task, so unchanged
-packages replay instead of rerunning.
+CI checks are defined once, in the reusable `.github/workflows/checks.yml`: typecheck,
+lint, knip, format:check, test, secrets-scan, CodeQL code scanning
+(`javascript-typescript`) and workflow-lint. workflow-lint calls the reusable workflow
+from `valuecodes/automation`: actionlint (with shellcheck) and zizmor over the workflow
+and action files. Each tool reads `.github/actionlint.yaml` / `zizmor.yml` if added. The
+typecheck and test jobs restore Turbo's `.turbo` cache from the previous run of the same
+task, so unchanged packages replay instead of rerunning. Two workflows call it:
 
-On push to `main`, the `deploy` job in `ci.yml` deploys the three workers to Cloudflare
-once `all-passed` succeeds, through the `production` environment. D1 migrations are a
-separate workflow (`migrations.yml`): it runs on push to `main` when
+- `feature.yml` (PRs) runs the checks and fans them into `all-passed`, the one check to
+  require in branch protection.
+- `main.yml` (push to `main`) runs the checks, then the `deploy` job deploys the three
+  workers to Cloudflare through the `production` environment.
+
+D1 migrations are a separate workflow (`migrations.yml`): it runs on push to `main` when
 `apps/operator/migrations/**` changes and does not wait for CI or the deploy.
 
 Dependabot (`.github/dependabot.yml`) bumps the SHA-pinned actions and reusable workflows

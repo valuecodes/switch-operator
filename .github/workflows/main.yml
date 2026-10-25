@@ -1,0 +1,60 @@
+name: Main branch CI
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A *running* main run (which may be deploying) is never cancelled; a
+  # *pending* one is still replaced by a newer push.
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/checks.yml # zizmor: ignore[self-repository]
+
+  # Deploys the workers once every check passed. The real security boundary is
+  # the `production` environment's deployment-branch rule (main only), set under
+  # Settings → Environments. D1 migrations apply separately, from
+  # `migrations.yml`.
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [checks]
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Setup
+        uses: ./.github/actions/setup # zizmor: ignore[self-repository]
+
+      - name: Deploy browser-scraper to Cloudflare Workers
+        run: pnpm --filter @repo/browser-scraper run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy operator to Cloudflare Workers
+        run: pnpm --filter @repo/operator run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy alerts to Cloudflare Workers
+        run: pnpm --filter @repo/alerts run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
