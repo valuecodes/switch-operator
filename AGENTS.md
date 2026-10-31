@@ -63,12 +63,23 @@ configured by the root `knip.jsonc` and exits 0 when clean. Formatting is oxfmt
 (Prettier-compatible), configured by the root `.oxfmtrc.jsonc`, which also sorts
 imports.
 
-There is no post-edit formatting hook: run `pnpm format` yourself before committing.
+Nothing formats on edit, and the pre-commit hook only checks formatting: run
+`pnpm format` yourself before committing.
 
-There are no git hooks. CI scans the full git history for secrets with the gitleaks
+Git hooks live in `.githooks/` and are plain shell scripts, with no hook manager.
+`pnpm install` enables them through the root `prepare` script. The setting goes in
+the clone's shared git config, so it covers every worktree, and a branch without
+`.githooks/` simply runs no hooks. If you cloned before the hooks existed and have
+not run `pnpm install` since, run `git config core.hooksPath .githooks` once.
+`pre-commit` runs `format:check`, `lint` and `gitleaks git --staged` with the local
+gitleaks (v8.19+). The secrets scan fails closed, so the commit is refused when
+gitleaks is not installed. `pre-push` runs `typecheck`, `test` and `knip`. CI still
+runs every check. `format:check` and `lint` read the working tree, not the staged
+snapshot, so stage everything you mean to commit.
+
+The hook runs whatever gitleaks is installed; CI scans the full git history with the
 version pinned in `secret-scan.yml` from `valuecodes/maintain-kit`, so this repo holds
-no gitleaks pin; a local `gitleaks git --staged` (gitleaks v8.19+) does the same for
-staged changes before a commit.
+no gitleaks pin.
 
 CI checks are defined once, in the reusable `.github/workflows/checks.yml`: typecheck,
 lint, knip, format:check, test, CodeQL code scanning (`javascript-typescript`),
@@ -115,6 +126,7 @@ same `valuecodes/maintain-kit` commit, so bump them together.
 
 - Keep diffs tight and focused; no drive-by refactors or new tooling without discussion.
 - Never commit secrets, credentials, `.env`, `.dev.vars` or `.prod.vars` files.
+- Never bypass the git hooks with `--no-verify`; fix the failure instead.
 - Add dependencies to the correct workspace with `pnpm --filter <package> add <dep>`.
   Every external version lives in the `catalog:` block of `pnpm-workspace.yaml`
   and manifests reference it as `catalog:`; `@repo/*` deps stay `workspace:*`.
