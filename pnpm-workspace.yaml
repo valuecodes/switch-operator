@@ -43,6 +43,10 @@ updateConfig:
 # guardrail, not a CI check.
 catalogMode: strict
 
+# Writes exact versions (no `^` or `~`) on `pnpm add`. pnpm 12 reads only
+# auth settings from `.npmrc`, so this has to live here.
+saveExact: true
+
 # Security floors for transitive deps whose parents still resolve a vulnerable
 # version. Drop an entry once `pnpm audit` stays clean without it.
 overrides:
@@ -64,6 +68,11 @@ allowBuilds:
   # fallback download) isn't needed. It has to be listed, even as false, or the
   # install fails with ERR_PNPM_IGNORED_BUILDS.
   workerd: false
+
+# pnpm already fails the install when the root `engines.node` doesn't match.
+# This also refuses any non-optional dependency whose own `engines` excludes
+# the running Node.js, instead of only warning.
+engineStrict: true
 
 # 14 days, in minutes: a new release is not resolvable until it is this old.
 # So `pnpm up --latest` deliberately skips fresh releases; use
