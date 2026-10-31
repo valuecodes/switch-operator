@@ -63,7 +63,7 @@ flowchart TD
 
 ## Development
 
-Requires Node 24 (exact version in `.nvmrc`) and pnpm 12 (see `packageManager`).
+Requires Node 26 (exact version in `.nvmrc`) and pnpm 12 (see `packageManager`).
 
 `pnpm install` also turns on the git hooks in `.githooks/`: format, lint and a staged
 secrets scan before each commit; typecheck, test and Knip before each push. Committing
