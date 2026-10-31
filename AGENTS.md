@@ -28,7 +28,7 @@ Guidelines for AI agents and contributors working in this Turborepo monorepo.
 | url-validator | `@repo/url-validator` | Safety policy checks for user-supplied URLs       |
 
 CI helpers are not workspaces: the composite setup action lives in
-`.github/actions/setup/` and the gitleaks script in `.github/scripts/`.
+`.github/actions/setup/`.
 
 Apps may import packages; packages must never import apps. oxlint bans `../`
 imports and deep `@repo/*/src` imports: import other workspaces by package name,
@@ -51,7 +51,6 @@ pnpm test                        # turbo run test
 pnpm build                       # turbo run build
 pnpm format                      # oxfmt, writes in place
 pnpm format:check                # oxfmt --check (no writes)
-pnpm secrets:scan                # gitleaks over the full git history
 pnpm clean                       # turbo run clean
 
 pnpm --filter @repo/operator set-webhook <url> [-- --prod]
@@ -66,15 +65,17 @@ imports.
 
 There is no post-edit formatting hook: run `pnpm format` yourself before committing.
 
-`secrets:scan` runs gitleaks (`.github/scripts/secrets-scan.sh`, version pinned
-there) using a local `gitleaks` v8.19+ if one is on PATH, otherwise the pinned Docker image.
-It exits 0 when clean and 1 when it finds a leak.
+There are no git hooks. CI scans the full git history for secrets with the gitleaks
+version pinned in `secret-scan.yml` from `valuecodes/maintain-kit`, so this repo holds
+no gitleaks pin; a local `gitleaks git --staged` (gitleaks v8.19+) does the same for
+staged changes before a commit.
 
 CI checks are defined once, in the reusable `.github/workflows/checks.yml`: typecheck,
-lint, knip, format:check, test, secrets-scan, CodeQL code scanning
-(`javascript-typescript`) and workflow-lint. workflow-lint calls the reusable workflow
-from `valuecodes/automation`: actionlint (with shellcheck) and zizmor over the workflow
-and action files. Each tool reads `.github/actionlint.yaml` / `zizmor.yml` if added. The
+lint, knip, format:check, test, CodeQL code scanning (`javascript-typescript`),
+secret-scan and workflow-lint. secret-scan and workflow-lint call the reusable workflows
+from `valuecodes/maintain-kit`: gitleaks over the full git history, and actionlint (with
+shellcheck) and zizmor over the workflow and action files. Each tool reads
+`.github/actionlint.yaml` / `zizmor.yml` if added. The
 typecheck and test jobs restore Turbo's `.turbo` cache from the previous run of the same
 task, so unchanged packages replay instead of rerunning. Two workflows call it:
 
@@ -89,18 +90,16 @@ D1 migrations are a separate workflow (`migrations.yml`): it runs on push to `ma
 Dependabot (`.github/dependabot.yml`) bumps the SHA-pinned actions and reusable workflows
 monthly in one grouped PR; npm dependencies are updated by hand.
 
-`maintenance-dashboard.yml` calls the maintenance dashboard workflow from
-`valuecodes/automation` daily.
-It keeps one issue, **Maintenance dashboard** (label `maintenance-dashboard`), listing
-what is due: `catalog:` updates, pnpm (`packageManager`), gitleaks (`GITLEAKS_VERSION`
-in the secrets-scan script), Node.js (`.nvmrc`) and `pnpm audit` findings. Like
+`maintain-kit-dashboard.yml` calls the dashboard workflow from
+`valuecodes/maintain-kit` daily.
+It keeps one issue, **Maintenance dashboard** (label `maintain-kit-dashboard`), listing
+what is due: `catalog:` updates, pnpm (`packageManager`), Node.js (`.nvmrc`) and
+`pnpm audit` findings. Like
 `minimumReleaseAge`, a release shows up only once it is 14 days old; a Node.js security
 release shows up right away and is flagged. It never opens PRs or commits; doing the
 updates stays manual. For a Node.js bump, change only `.nvmrc` (the one place that
-holds the exact version). If `GITLEAKS_VERSION` moves out of
-`.github/scripts/secrets-scan.sh`, pass the new path as the `gitleaks-script` input.
-The dashboard and workflow-lint callers pin the same `valuecodes/automation` commit, so
-bump them together.
+holds the exact version). The dashboard, secret-scan and workflow-lint callers pin the
+same `valuecodes/maintain-kit` commit, so bump them together.
 
 ---
 
