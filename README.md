@@ -37,7 +37,7 @@ packages/
   telegram/         # Telegram Bot API client
   typescript/       # Shared TypeScript config
   url-validator/    # Safety policy checks for user-supplied URLs
-.github/            # CI workflow, composite setup action, secrets-scan script
+.github/            # CI workflows, composite setup action
 .oxlintrc.json      # Single root lint config
 .oxfmtrc.jsonc      # Single root format config
 ```
@@ -73,7 +73,6 @@ pnpm typecheck        # type checking
 pnpm lint             # oxlint
 pnpm knip             # unused files, exports and dependencies
 pnpm test             # run tests
-pnpm secrets:scan     # gitleaks over git history
 pnpm format:check     # check formatting
 pnpm format           # fix formatting
 ```
@@ -87,10 +86,15 @@ to tunnel to your local worker. See
 ## CI and repo settings
 
 The checks live in `.github/workflows/checks.yml`: typecheck, lint, knip, format:check,
-test, a gitleaks secret scan, CodeQL and actionlint + zizmor over the workflow files.
-`feature.yml` runs them on PRs and fans them into `all-passed`; `main.yml` runs them on
-push to `main`, then the `deploy` job deploys the workers. GitHub settings this relies
-on:
+test, CodeQL, a gitleaks secret scan over the full git history and actionlint + zizmor
+over the workflow files; the last two run through the reusable `secret-scan.yml` and
+`workflow-lint.yml` from `valuecodes/maintain-kit`. `feature.yml` runs them on PRs and
+fans them into `all-passed`; `main.yml` runs them on push to `main`, then the `deploy`
+job deploys the workers. There are no git hooks: to scan staged changes before a
+commit, run `gitleaks git --staged` with gitleaks v8.19+ (`brew install gitleaks` on
+macOS, Linux and WSL, or unpack the `linux_x64` tarball from the
+[releases page](https://github.com/gitleaks/gitleaks/releases) into a directory on
+PATH such as `~/.local/bin`). GitHub settings this relies on:
 
 1. **Rules → Rulesets**: the `main` ruleset requires a pull request and the
    `all-passed` status check, the only one to list.
@@ -100,5 +104,5 @@ on:
    CodeQL uploads from `checks.yml`.
 4. **Code security → Dependabot**: **alerts** on, **security updates** off.
    `.github/dependabot.yml` only bumps the SHA-pinned GitHub Actions monthly.
-5. **Issues**: run the `Maintenance dashboard` workflow once, then pin the
+5. **Issues**: run the `Maintain-kit dashboard` workflow once, then pin the
    **Maintenance dashboard** issue it creates.
