@@ -13,8 +13,8 @@ catalog:
   # At least the version `wrangler` declares as its peer.
   "@cloudflare/workers-types": 5.20261011.1
   "@hono/zod-validator": 0.9.1
-  # Held on the Node 24 line to match `.nvmrc` (see `updateConfig` below).
-  "@types/node": 24.19.2
+  # Held on the Node 26 line to match `.nvmrc` (see `updateConfig` below).
+  "@types/node": 26.6.5
   drizzle-kit: 0.31.11
   drizzle-orm: 0.45.4
   hono: 4.13.13

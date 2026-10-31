@@ -38,7 +38,7 @@ and inside an app use the `~/` alias (`src/*`) to go up the tree.
 
 ## Commands
 
-**Prerequisites:** Node.js 24 (exact version in `.nvmrc`), pnpm 12.12.0 (`packageManager` in root `package.json`).
+**Prerequisites:** Node.js 26 (exact version in `.nvmrc`), pnpm 12.12.0 (`packageManager` in root `package.json`).
 
 ```bash
 pnpm install                     # Install all dependencies
