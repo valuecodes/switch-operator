@@ -1,0 +1,20 @@
+#!/bin/sh
+# Fast checks before every commit; the heavier ones run in pre-push, and CI runs
+# all of them again. Enabled by `pnpm install` (the root `prepare` script) or
+# `git config core.hooksPath .githooks`. Never bypass with --no-verify: fix the
+# failure instead.
+#
+# format:check and lint read the working tree, not the staged snapshot, so
+# unstaged edits can make them pass or fail. Stage everything you mean to commit.
+set -eu
+
+pnpm format:check
+pnpm lint
+
+# Scan only what is staged, with a local gitleaks (8.19+ for `git --staged`).
+# This fails closed: without gitleaks the commit is refused, since the point of
+# this hook is to stop a secret before it reaches the remote. CI scans the full
+# history through secret-scan.yml from valuecodes/maintain-kit, which pins the
+# gitleaks version.
+gitleaks git --help >/dev/null 2>&1 || { echo "install gitleaks 8.19+: https://github.com/gitleaks/gitleaks#installing" >&2; exit 2; }
+gitleaks git --staged --redact "$(git rev-parse --show-toplevel)"

@@ -65,6 +65,13 @@ flowchart TD
 
 Requires Node 24 (exact version in `.nvmrc`) and pnpm 12 (see `packageManager`).
 
+`pnpm install` also turns on the git hooks in `.githooks/`: format, lint and a staged
+secrets scan before each commit; typecheck, test and Knip before each push. Committing
+needs `gitleaks` v8.19+ on PATH for the staged secrets scan: `brew install gitleaks`
+(macOS, Linux and WSL), or unpack the `linux_x64` tarball from the
+[releases page](https://github.com/gitleaks/gitleaks/releases) into a directory on
+PATH such as `~/.local/bin`.
+
 ```sh
 pnpm install          # install dependencies
 pnpm dev              # start local dev server
@@ -90,11 +97,7 @@ test, CodeQL, a gitleaks secret scan over the full git history and actionlint + 
 over the workflow files; the last two run through the reusable `secret-scan.yml` and
 `workflow-lint.yml` from `valuecodes/maintain-kit`. `feature.yml` runs them on PRs and
 fans them into `all-passed`; `main.yml` runs them on push to `main`, then the `deploy`
-job deploys the workers. There are no git hooks: to scan staged changes before a
-commit, run `gitleaks git --staged` with gitleaks v8.19+ (`brew install gitleaks` on
-macOS, Linux and WSL, or unpack the `linux_x64` tarball from the
-[releases page](https://github.com/gitleaks/gitleaks/releases) into a directory on
-PATH such as `~/.local/bin`). GitHub settings this relies on:
+job deploys the workers. GitHub settings this relies on:
 
 1. **Rules → Rulesets**: the `main` ruleset requires a pull request and the
    `all-passed` status check, the only one to list.
