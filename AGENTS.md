@@ -96,9 +96,17 @@ It keeps one issue, **Maintenance dashboard** (label `maintain-kit-dashboard`), 
 what is due: `catalog:` updates, pnpm (`packageManager`), Node.js (`.nvmrc`) and
 `pnpm audit` findings. Like
 `minimumReleaseAge`, a release shows up only once it is 14 days old; a Node.js security
-release shows up right away and is flagged. It never opens PRs or commits; doing the
-updates stays manual. For a Node.js bump, change only `.nvmrc` (the one place that
-holds the exact version). The dashboard, secret-scan and workflow-lint callers pin the
+release shows up right away and is flagged. It never opens PRs or commits. For a
+Node.js bump, change only `.nvmrc` (the one place that holds the exact version).
+
+`maintain-kit-updates.yml` calls the updates workflow from
+`valuecodes/maintain-kit` weekly. It keeps one PR per kind open (Node.js, pnpm,
+`catalog:`) on a `maintain-kit/<kind>` branch, for updates on the
+current major only; majors stay manual. Those PRs are opened with `GITHUB_TOKEN`, so
+their `pull_request` checks wait until someone with write access clicks **Approve
+workflows to run** in the PR. It needs **Allow GitHub Actions to create and approve
+pull requests** turned on under Settings → Actions → General. Nothing auto-merges.
+The dashboard, updates, secret-scan and workflow-lint callers pin the
 same `valuecodes/maintain-kit` commit, so bump them together.
 
 ---

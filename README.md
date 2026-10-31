@@ -106,3 +106,7 @@ PATH such as `~/.local/bin`). GitHub settings this relies on:
    `.github/dependabot.yml` only bumps the SHA-pinned GitHub Actions monthly.
 5. **Issues**: run the `Maintain-kit dashboard` workflow once, then pin the
    **Maintenance dashboard** issue it creates.
+6. **Actions → General**: turn on **Allow GitHub Actions to create and approve pull
+   requests**. `maintain-kit-updates.yml` needs it for its weekly update PRs (one
+   per kind: Node.js, pnpm, `catalog:`). Nothing auto-merges, and each PR's checks
+   wait until someone approves the workflows to run in the PR.

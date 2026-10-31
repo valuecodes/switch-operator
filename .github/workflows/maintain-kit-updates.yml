@@ -1,0 +1,24 @@
+name: Maintain-kit updates
+
+on:
+  schedule:
+    # Weekly on Monday, after the daily dashboard run. An off-peak minute avoids
+    # the top-of-the-hour queue.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  # Keeps one PR per update kind (Node.js, pnpm, catalog) open for updates on
+  # the current major. Nothing auto-merges. The PRs are opened with
+  # GITHUB_TOKEN, so their `pull_request` checks wait for someone with write
+  # access to approve them in the PR. A called workflow cannot raise the
+  # caller's token, so the job grants it here.
+  maintain-kit-updates:
+    permissions:
+      contents: write # push the update branches
+      pull-requests: write # open, edit and close the PRs
+      actions: write # required by the called job even without ci-workflow
+      issues: read # link the dashboard issue
+    uses: valuecodes/maintain-kit/.github/workflows/updates.yml@e5bf1d24a413d9312cd2051c39ef44ddd9358be5 # v1.0.0
